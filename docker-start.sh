@@ -1,9 +1,10 @@
 #!/bin/bash
-set -e
 
 APP_PORT="${PORT:-8000}"
 
-echo "==> Writing .env file..."
+echo "==> PORT is: $APP_PORT"
+
+# Write .env
 cat > /var/www/html/.env << ENVEOF
 APP_NAME=${APP_NAME:-BusTicketIndia}
 APP_ENV=${APP_ENV:-production}
@@ -47,14 +48,18 @@ GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
 GOOGLE_REDIRECT_URL=${GOOGLE_REDIRECT_URL}
 ENVEOF
 
+echo "==> .env written"
+
 cd /var/www/html
 
-echo "==> Running artisan commands..."
-php artisan config:clear
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-php artisan migrate --force --no-interaction
+echo "==> Clearing config..."
+php artisan config:clear || echo "config:clear failed, continuing..."
 
-echo "==> Starting Laravel on port ${APP_PORT}..."
+echo "==> Caching config..."
+php artisan config:cache || echo "config:cache failed, continuing..."
+
+echo "==> Running migrations..."
+php artisan migrate --force --no-interaction || echo "migrate failed, continuing..."
+
+echo "==> Starting server on 0.0.0.0:${APP_PORT}"
 exec php artisan serve --host=0.0.0.0 --port=${APP_PORT}
