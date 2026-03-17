@@ -33,9 +33,9 @@ return new class extends Migration
             $table->index('statut');
             $table->index('expire_at');
             
-            // Foreign keys
-            $table->foreign('agency_id')->references('id')->on('bus_agencies')->onDelete('set null');
-            $table->foreign('route_id')->references('id')->on('bus_routes')->onDelete('set null');
+            // Foreign keys - commented out until bus_agencies and bus_routes tables exist
+            // $table->foreign('agency_id')->references('id')->on('bus_agencies')->onDelete('set null');
+            // $table->foreign('route_id')->references('id')->on('bus_routes')->onDelete('set null');
         });
     }
 
