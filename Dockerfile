@@ -33,9 +33,11 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --no-script
 # Install Node and build assets
 RUN rm -f package-lock.json && npm install --include=dev && npm run build
 
-# Permissions
+# Permissions - fix ownership and permissions
 RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+    && chmod -R 755 /var/www/html \
+    && chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache \
+    && chown -R 1000:1000 /var/www/html
 
 COPY docker-start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh

@@ -9,6 +9,10 @@ echo "PORT: $APP_PORT"
 echo "PWD: $(pwd)"
 echo "USER: $(whoami)"
 
+# Fix permissions first
+chmod 755 /var/www/html
+chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+
 # Write .env
 echo "Writing .env file..."
 cat > /var/www/html/.env << ENVEOF
@@ -66,7 +70,7 @@ echo "Caching config..."
 php artisan config:cache 2>&1 || echo "config:cache failed"
 
 echo "Running migrations..."
-php artisan migrate --force --no-interaction 2>&1 || echo "migrate failed"
+php artisan migrate:fresh --force --no-interaction 2>&1 || echo "migrate failed"
 
 echo "========================================="
 echo "STARTING LARAVEL SERVER ON 0.0.0.0:${APP_PORT}"
