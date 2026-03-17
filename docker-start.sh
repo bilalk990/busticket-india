@@ -70,7 +70,9 @@ echo "Caching config..."
 php artisan config:cache 2>&1 || echo "config:cache failed"
 
 echo "Running migrations..."
-php artisan migrate:fresh --force --no-interaction 2>&1 || echo "migrate failed"
+# Skip migrations for now to get site live
+echo "Skipping migrations temporarily - will fix table dependencies later"
+# php artisan migrate:fresh --force --no-interaction 2>&1 || echo "migrate failed"
 
 echo "========================================="
 echo "STARTING LARAVEL SERVER ON 0.0.0.0:${APP_PORT}"
