@@ -1,10 +1,16 @@
 #!/bin/bash
 
-APP_PORT="${PORT:-8000}"
+echo "========================================="
+echo "KIRO STARTUP SCRIPT STARTED"
+echo "========================================="
 
-echo "==> PORT is: $APP_PORT"
+APP_PORT="${PORT:-8000}"
+echo "PORT: $APP_PORT"
+echo "PWD: $(pwd)"
+echo "USER: $(whoami)"
 
 # Write .env
+echo "Writing .env file..."
 cat > /var/www/html/.env << ENVEOF
 APP_NAME=${APP_NAME:-BusTicketIndia}
 APP_ENV=${APP_ENV:-production}
@@ -48,18 +54,22 @@ GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
 GOOGLE_REDIRECT_URL=${GOOGLE_REDIRECT_URL}
 ENVEOF
 
-echo "==> .env written"
+echo ".env file written successfully"
 
 cd /var/www/html
+echo "Changed to directory: $(pwd)"
 
-echo "==> Clearing config..."
-php artisan config:clear || echo "config:clear failed, continuing..."
+echo "Clearing Laravel caches..."
+php artisan config:clear 2>&1 || echo "config:clear failed"
 
-echo "==> Caching config..."
-php artisan config:cache || echo "config:cache failed, continuing..."
+echo "Caching config..."
+php artisan config:cache 2>&1 || echo "config:cache failed"
 
-echo "==> Running migrations..."
-php artisan migrate --force --no-interaction || echo "migrate failed, continuing..."
+echo "Running migrations..."
+php artisan migrate --force --no-interaction 2>&1 || echo "migrate failed"
 
-echo "==> Starting server on 0.0.0.0:${APP_PORT}"
+echo "========================================="
+echo "STARTING LARAVEL SERVER ON 0.0.0.0:${APP_PORT}"
+echo "========================================="
+
 exec php artisan serve --host=0.0.0.0 --port=${APP_PORT}
