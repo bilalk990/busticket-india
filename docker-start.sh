@@ -19,7 +19,7 @@ cat > /var/www/html/.env << ENVEOF
 APP_NAME=${APP_NAME:-BusTicketIndia}
 APP_ENV=${APP_ENV:-production}
 APP_KEY=${APP_KEY}
-APP_DEBUG=${APP_DEBUG:-false}
+APP_DEBUG=${APP_DEBUG:-true}
 APP_URL=${APP_URL:-http://localhost}
 APP_TIMEZONE=${APP_TIMEZONE:-UTC}
 APP_LOCALE=${APP_LOCALE:-en}
