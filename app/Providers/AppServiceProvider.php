@@ -27,25 +27,6 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        // Register CurrencyHelper as a global helper
-        if (!function_exists('currency_convert')) {
-            function currency_convert($amount, $fromCurrency, $toCurrency = null, $exchangeRates = null) {
-                return CurrencyHelper::convertCurrency($amount, $fromCurrency, $toCurrency, $exchangeRates);
-            }
-        }
-
-        if (!function_exists('currency_format')) {
-            function currency_format($amount, $currency = null, $exchangeRates = null) {
-                return CurrencyHelper::formatCurrency($amount, $currency, $exchangeRates);
-            }
-        }
-
-        if (!function_exists('currency_convert_and_format')) {
-            function currency_convert_and_format($amount, $fromCurrency, $toCurrency = null, $exchangeRates = null) {
-                return CurrencyHelper::convertAndFormat($amount, $fromCurrency, $toCurrency, $exchangeRates);
-            }
-        }
-
         // Register Blade directives for currency conversion
         Blade::directive('currency', function ($expression) {
             return "<?php echo \App\Helpers\CurrencyHelper::convertAndFormat($expression); ?>";
