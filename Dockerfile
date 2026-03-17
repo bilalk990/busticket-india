@@ -38,7 +38,8 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --no-script
 RUN php artisan package:discover --ansi
 
 # Install Node dependencies and build assets
-RUN npm install --include=dev && NODE_ENV=development npm run build
+# Remove package-lock.json to avoid platform-specific binary issues (Windows vs Linux)
+RUN rm -f package-lock.json && npm install --include=dev && npm run build
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache \
