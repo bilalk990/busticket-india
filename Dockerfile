@@ -42,4 +42,5 @@ RUN chmod +x /usr/local/bin/start.sh
 
 EXPOSE 8000
 
-CMD ["/usr/local/bin/start.sh"]
+# Direct command without script for testing
+CMD ["sh", "-c", "echo 'DIRECT CMD STARTED' && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"]
