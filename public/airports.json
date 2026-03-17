@@ -1,0 +1,54 @@
+{
+    "airports": [
+        {
+            "code": "JFK",
+            "name": "John F. Kennedy International Airport",
+            "city": "New York"
+        },
+        {
+            "code": "LGA",
+            "name": "LaGuardia Airport",
+            "city": "New York"
+        },
+        {
+            "code": "ATL",
+            "name": "Hartsfield-Jackson Atlanta International Airport",
+            "city": "Atlanta"
+        },
+        {
+            "code": "ORD",
+            "name": "O'Hare International Airport",
+            "city": "Chicago"
+        },
+        {
+            "code": "LAX",
+            "name": "Los Angeles International Airport",
+            "city": "Los Angeles"
+        },
+        {
+            "code": "DFW",
+            "name": "Dallas/Fort Worth International Airport",
+            "city": "Dallas"
+        },
+        {
+            "code": "DEN",
+            "name": "Denver International Airport",
+            "city": "Denver"
+        },
+        {
+            "code": "SEA",
+            "name": "Seattle-Tacoma International Airport",
+            "city": "Seattle"
+        },
+        {
+            "code": "MIA",
+            "name": "Miami International Airport",
+            "city": "Miami"
+        },
+        {
+            "code": "BOS",
+            "name": "Logan International Airport",
+            "city": "Boston"
+        }
+    ]
+}

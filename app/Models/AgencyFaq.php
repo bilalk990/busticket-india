@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class AgencyFaq extends Model
+{
+    use HasFactory;
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<int, string>
+     */
+    protected $fillable = [
+        'bus_agency_id',
+        'question',
+        'answer',
+        'order',
+        'status'
+    ];
+
+    /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'status' => 'boolean',
+        'order' => 'integer',
+    ];
+
+    /**
+     * Get the bus agency that owns the FAQ.
+     */
+    public function busAgency()
+    {
+        return $this->belongsTo(BusAgency::class, 'bus_agency_id');
+    }
+} 
