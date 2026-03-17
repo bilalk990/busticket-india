@@ -21,8 +21,9 @@ WORKDIR /var/www/html
 # Copy application files
 COPY . /var/www/html
 
-# Install PHP dependencies (no-dev, ignore platform reqs to avoid redis issue)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --ignore-platform-reqs
+# Install PHP dependencies
+RUN composer install --no-dev --optimize-autoloader --no-interaction \
+    --ignore-platform-req=ext-redis
 
 # Install Node dependencies and build assets
 RUN npm install --include=dev && NODE_ENV=development npm run build
