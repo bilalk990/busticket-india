@@ -15,15 +15,27 @@ RUN a2enmod rewrite
 # Install Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set working directory
 WORKDIR /var/www/html
 
 # Copy application files
 COPY . /var/www/html
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader --no-interaction \
-    --ignore-platform-req=ext-redis
+# Create a minimal .env for build time only
+RUN echo "APP_KEY=base64:CQfOYvqg1MmuqDyaWm6coekjwC0WLRJ7KD134PQZrxo=" > .env && \
+    echo "APP_ENV=production" >> .env && \
+    echo "APP_DEBUG=false" >> .env && \
+    echo "DB_CONNECTION=sqlite" >> .env && \
+    echo "DB_DATABASE=/tmp/build.sqlite" >> .env && \
+    echo "CACHE_STORE=array" >> .env && \
+    echo "SESSION_DRIVER=array" >> .env && \
+    echo "REDIS_CLIENT=predis" >> .env && \
+    touch /tmp/build.sqlite
+
+# Install PHP dependencies (no scripts to avoid artisan calls)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+
+# Now run package:discover with safe env
+RUN php artisan package:discover --ansi
 
 # Install Node dependencies and build assets
 RUN npm install --include=dev && NODE_ENV=development npm run build
