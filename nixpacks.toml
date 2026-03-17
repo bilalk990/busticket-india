@@ -1,0 +1,12 @@
+[providers.php]
+extensions = ['ctype', 'curl', 'dom', 'fileinfo', 'filter', 'hash', 'mbstring', 'openssl', 'pcre', 'pdo', 'session', 'tokenizer', 'xml', 'gd']
+
+[phases.setup]
+nixPkgs = ['...', 'php82', 'php82Packages.composer', 'nodejs_20']
+
+[phases.build]
+cmds = [
+    'composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader',
+    'npm install',
+    'npm run build'
+]
