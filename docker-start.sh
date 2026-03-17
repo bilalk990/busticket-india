@@ -69,10 +69,12 @@ php artisan config:clear 2>&1 || echo "config:clear failed"
 echo "Caching config..."
 php artisan config:cache 2>&1 || echo "config:cache failed"
 
+echo "Testing database connection..."
+php artisan tinker --execute="DB::connection()->getPdo(); echo 'Database connected successfully!';" 2>&1 || echo "Database connection failed"
+
 echo "Running migrations..."
-# Skip migrations for now to get site live
-echo "Skipping migrations temporarily - will fix table dependencies later"
-# php artisan migrate:fresh --force --no-interaction 2>&1 || echo "migrate failed"
+# Database schema already exists, just run migrations to sync
+php artisan migrate --force --no-interaction 2>&1 || echo "migrate failed - schema might already exist"
 
 echo "========================================="
 echo "STARTING LARAVEL SERVER ON 0.0.0.0:${APP_PORT}"
