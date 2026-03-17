@@ -1,15 +1,9 @@
 #!/bin/bash
 set -e
 
-APP_PORT="${PORT:-80}"
+APP_PORT="${PORT:-8000}"
 
-echo "Starting on port: $APP_PORT"
-
-# Update Apache ports
-echo "Listen ${APP_PORT}" > /etc/apache2/ports.conf
-sed -i "s/\*:\${PORT}/\*:${APP_PORT}/g" /etc/apache2/sites-available/000-default.conf
-
-# Write .env from Railway environment variables
+echo "==> Writing .env file..."
 cat > /var/www/html/.env << ENVEOF
 APP_NAME=${APP_NAME:-BusTicketIndia}
 APP_ENV=${APP_ENV:-production}
@@ -55,12 +49,12 @@ ENVEOF
 
 cd /var/www/html
 
-# Laravel bootstrap
+echo "==> Running artisan commands..."
 php artisan config:clear
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 php artisan migrate --force --no-interaction
 
-echo "Apache starting on port ${APP_PORT}"
-exec apache2-foreground
+echo "==> Starting Laravel on port ${APP_PORT}..."
+exec php artisan serve --host=0.0.0.0 --port=${APP_PORT}
