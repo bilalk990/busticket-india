@@ -31,7 +31,10 @@ COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Install Node dependencies (including dev dependencies for build)
-RUN npm install && npm run build
+RUN npm install --include=dev
+
+# Build assets
+RUN NODE_ENV=development npm run build
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
