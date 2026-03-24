@@ -1,15 +1,8 @@
 [phases.setup]
-nixPkgs = ["php", "nginx", "nodejs", "npm"]
+nixPkgs = ["php", "nginx"]
 
 [phases.install]
-cmds = [
-    "rm -rf node_modules package-lock.json",
-    "npm install",
-    "composer install --ignore-platform-reqs"
-]
-
-[phases.build]
-cmds = ["npm run build"]
+cmds = ["composer install --ignore-platform-reqs --no-dev --optimize-autoloader"]
 
 [start]
 cmd = "php artisan serve --host=0.0.0.0 --port=${PORT:-8080}"
