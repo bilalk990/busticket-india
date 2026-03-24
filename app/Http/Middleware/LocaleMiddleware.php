@@ -23,60 +23,38 @@ class LocaleMiddleware
 
 
         if (!$locale) {
-            // Cache IP-based locale detection for 24 hours
-            $locale = Cache::remember('user_locale_' . $request->ip(), 86400, function () {
-                try {
-                    $response = Http::timeout(3)->get('http://ip-api.com/json');
-                    $locationData = $response->json();
+            // Cache IP-based locale detection for 24 hours (skip if Redis not available)
+            try {
+                $locale = Cache::remember('user_locale_' . $request->ip(), 86400, function () {
+                    try {
+                        $response = Http::timeout(3)->get('http://ip-api.com/json');
+                        $locationData = $response->json();
 
-                    if ($response->successful() && isset($locationData['countryCode'])) {
-                        $countryCode = strtolower($locationData['countryCode']);
+                        if ($response->successful() && isset($locationData['countryCode'])) {
+                            $countryCode = strtolower($locationData['countryCode']);
 
-                        $localeMap = [
-                            'us' => 'en',
-                            'gb' => 'en',
-                            'ru' => 'ru',
-                            'fr' => 'fr',
-                            'xk' => 'sq',
-                            // 'de' => 'de',
-                            // 'es' => 'es',
-                            // 'sa' => 'ar',
-                            // 'za' => 'af',
-                            // 'id' => 'id',
-                            // 'bd' => 'bn',
-                            // 'bg' => 'bg',
-                            // 'cn' => 'zh',
-                            // 'cz' => 'cs',
-                            // 'dk' => 'da',
-                            // 'fi' => 'fi',
-                            // 'in' => 'hi',
-                            // 'hr' => 'hr',
-                            // 'hu' => 'hu',
-                            // 'it' => 'it',
-                            // 'jp' => 'ja',
-                            // 'kr' => 'ko',
-                            // 'my' => 'ms',
-                            // 'nl' => 'nl',
-                            // 'no' => 'no',
-                            // 'pl' => 'pl',
-                            // 'pt' => 'pt-pt',
-                            // 'ro' => 'ro',
-                            // 'tz' => 'sw',
-                            // 'se' => 'sv',
-                            // 'tr' => 'tr',
-                            // 'vn' => 'vi',
-                        ];
+                            $localeMap = [
+                                'us' => 'en',
+                                'gb' => 'en',
+                                'ru' => 'ru',
+                                'fr' => 'fr',
+                                'xk' => 'sq',
+                            ];
 
-                        return $localeMap[$countryCode] ?? config('app.locale');
-                    } else {
+                            return $localeMap[$countryCode] ?? config('app.locale');
+                        } else {
+                            return config('app.locale');
+                        }
+                    } catch (\Exception $e) {
+                        \Log::warning('Failed to detect locale from IP API: ' . $e->getMessage());
                         return config('app.locale');
                     }
-                } catch (\Exception $e) {
-                    // Log the error for debugging but don't break the application
-                    \Log::warning('Failed to detect locale from IP API: ' . $e->getMessage());
-                    return config('app.locale');
-                }
-            });
+                });
+            } catch (\Exception $e) {
+                // If cache fails (Redis not available), just use default locale
+                \Log::debug('Cache not available in LocaleMiddleware: ' . $e->getMessage());
+                $locale = config('app.locale');
+            }
         }
 
 
