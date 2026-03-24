@@ -1,0 +1,5 @@
+# Force Railway cache clear
+# Build timestamp: 2026-03-25-v3
+node_modules/
+package-lock.json
+package.json
