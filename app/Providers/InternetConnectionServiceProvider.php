@@ -23,7 +23,15 @@ class InternetConnectionServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Clear internet connection cache when the application starts
-        Cache::forget('internet_connection_status');
+        // Only if cache driver is available and not Redis (for Railway compatibility)
+        try {
+            if (config('cache.default') !== 'redis') {
+                Cache::forget('internet_connection_status');
+            }
+        } catch (\Exception $e) {
+            // Silently fail if cache is not available
+            Log::debug('Cache not available during boot: ' . $e->getMessage());
+        }
         
         // Schedule periodic internet connectivity checks
         if ($this->app->runningInConsole()) {
