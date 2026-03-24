@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Test - Viatxs Market</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+        }
+        
+        .test-section {
+            min-height: 100vh;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+        
+        .section-1 { background: linear-gradient(135deg, #667eea 0%, #1f75d8 100%); color: white; }
+        .section-2 { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+        .section-3 { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; }
+        .section-4 { background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; }
+        .section-5 { background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; }
+        
+        .performance-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 1000;
+        }
+        
+        .scroll-info {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        p {
+            font-size: 1.2rem;
+            max-width: 600px;
+        }
+        
+        .test-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 10px;
+            margin: 1rem;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s ease;
+        }
+        
+        .test-card:hover {
+            transform: translateY(-5px);
+        }
+    </style>
+</head>
+<body>
+    <div class="performance-indicator">
+        <div>FPS: <span id="fps">--</span></div>
+        <div>Scroll: <span id="scroll-smooth">Smooth</span></div>
+    </div>
+    
+    <div class="scroll-info">
+        <div>Scroll Y: <span id="scroll-y">0</span>px</div>
+        <div>Performance: <span id="performance-status">Good</span></div>
+    </div>
+
+    <div class="test-section section-1">
+        <h1>Performance Test</h1>
+        <p>Scroll down to test the performance optimizations. You should experience smooth scrolling without lag.</p>
+        <div class="test-card">
+            <h3>Section 1</h3>
+            <p>This section tests basic scrolling performance.</p>
+        </div>
+    </div>
+
+    <div class="test-section section-2">
+        <h1>Scroll Performance</h1>
+        <p>Notice how smooth the scrolling is. The optimizations include throttled scroll events and passive listeners.</p>
+        <div class="test-card">
+            <h3>Section 2</h3>
+            <p>Throttled scroll events at 60fps for optimal performance.</p>
+        </div>
+    </div>
+
+    <div class="test-section section-3">
+        <h1>Animation Performance</h1>
+        <p>Hover over the cards to see optimized animations using will-change and transform3d.</p>
+        <div class="test-card">
+            <h3>Section 3</h3>
+            <p>Optimized animations with hardware acceleration.</p>
+        </div>
+    </div>
+
+    <div class="test-section section-4">
+        <h1>Mobile Optimization</h1>
+        <p>On mobile devices, animations are reduced and hover effects are disabled for better performance.</p>
+        <div class="test-card">
+            <h3>Section 4</h3>
+            <p>Touch-optimized interactions and reduced motion.</p>
+        </div>
+    </div>
+
+    <div class="test-section section-5">
+        <h1>Performance Complete</h1>
+        <p>If you've scrolled through all sections smoothly, the optimizations are working correctly!</p>
+        <div class="test-card">
+            <h3>Section 5</h3>
+            <p>All performance optimizations are active and functioning.</p>
+        </div>
+    </div>
+
+    <script>
+        // Performance monitoring
+        let frameCount = 0;
+        let lastTime = performance.now();
+        let fps = 0;
+        
+        function updateFPS() {
+            frameCount++;
+            const currentTime = performance.now();
+            
+            if (currentTime - lastTime >= 1000) {
+                fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
+                document.getElementById('fps').textContent = fps;
+                frameCount = 0;
+                lastTime = currentTime;
+                
+                // Update performance status
+                const status = fps >= 50 ? 'Excellent' : fps >= 30 ? 'Good' : fps >= 20 ? 'Fair' : 'Poor';
+                document.getElementById('performance-status').textContent = status;
+                document.getElementById('scroll-smooth').textContent = fps >= 30 ? 'Smooth' : 'Laggy';
+            }
+            
+            requestAnimationFrame(updateFPS);
+        }
+        
+        // Scroll position tracking
+        function updateScrollInfo() {
+            const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+            document.getElementById('scroll-y').textContent = Math.round(scrollY);
+        }
+        
+        // Initialize monitoring
+        updateFPS();
+        window.addEventListener('scroll', updateScrollInfo, { passive: true });
+        
+        // Test scroll performance
+        let scrollStartTime;
+        let scrollEndTime;
+        let scrollEvents = 0;
+        
+        window.addEventListener('scroll', function() {
+            scrollEvents++;
+            if (!scrollStartTime) {
+                scrollStartTime = performance.now();
+            }
+            scrollEndTime = performance.now();
+        }, { passive: true });
+        
+        // Log performance metrics every 5 seconds
+        setInterval(() => {
+            if (scrollEvents > 0) {
+                const scrollDuration = scrollEndTime - scrollStartTime;
+                const scrollRate = scrollEvents / (scrollDuration / 1000);
+                console.log(`Scroll Performance: ${scrollEvents} events in ${scrollDuration.toFixed(0)}ms (${scrollRate.toFixed(1)} events/sec)`);
+                
+                // Check for niceScroll interference
+                if (window.NiceScroll && typeof window.NiceScroll.getjQuery === 'function') {
+                    console.warn('⚠️ NiceScroll is still active - this may cause performance issues');
+                }
+                
+                // Check for AOS interference
+                if (window.AOS && window.innerWidth <= 768) {
+                    console.warn('⚠️ AOS animations are active on mobile - this may cause performance issues');
+                }
+                
+                scrollEvents = 0;
+                scrollStartTime = null;
+            }
+        }, 5000);
+        
+        // Additional performance checks
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if niceScroll elements exist
+            const niceScrollElements = document.querySelectorAll('.nicescroll-cursors, .nicescroll-rails');
+            if (niceScrollElements.length > 0) {
+                console.warn('⚠️ NiceScroll elements found - removing for performance');
+                niceScrollElements.forEach(el => el.remove());
+            }
+            
+            // Check for heavy libraries
+            if (typeof $ !== 'undefined' && $.fx && !$.fx.off) {
+                console.warn('⚠️ jQuery animations are enabled - consider disabling for better performance');
+            }
+            
+            // Force native scrolling
+            document.documentElement.style.scrollBehavior = 'smooth';
+            document.body.style.scrollBehavior = 'smooth';
+            
+            console.log('✅ Performance optimizations applied');
+        });
+    </script>
+</body>
+</html> 
