@@ -109,6 +109,16 @@ $matchingReturn = $returnSchedules->firstWhere('bus.agency_id', $schedule['bus']
                         </div>
                     </div>
                     <h6 class="mb-0 small fw-medium">{{ $schedule['duration'] }}</h6>
+                    @if(isset($schedule['stops']) && count($schedule['stops']) > 0)
+                        <button type="button" class="btn btn-link btn-sm p-0 mt-1 text-decoration-none" 
+                                data-bs-toggle="collapse" 
+                                data-bs-target="#stops-{{ $schedule['id'] }}" 
+                                aria-expanded="false">
+                            <small class="text-primary">
+                                <i class="fas fa-map-marker-alt me-1"></i>{{ count($schedule['stops']) }} stops
+                            </small>
+                        </button>
+                    @endif
                 </div>
             </div>
 
@@ -131,8 +141,8 @@ $matchingReturn = $returnSchedules->firstWhere('bus.agency_id', $schedule['bus']
 
     <!-- Bus Footer -->
     <div class="card-footer bg-light py-2">
-        <div class="d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="d-flex align-items-center flex-wrap">
                 <span class="small text-muted me-2">Facilities:</span>
                 <div>
                     @foreach($schedule['amenities'] as $facility)
@@ -140,6 +150,15 @@ $matchingReturn = $returnSchedules->firstWhere('bus.agency_id', $schedule['bus']
                     @endforeach
                 </div>
             </div>
+            
+            @if(isset($schedule['stops']) && count($schedule['stops']) > 0)
+            <div class="d-flex align-items-center">
+                <button type="button" class="btn btn-sm btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#stopsModal{{ $schedule['id'] }}">
+                    <i class="fas fa-route me-1"></i> View Stops
+                </button>
+            </div>
+            @endif
+            
             <div class="d-flex align-items-center">
                 <span class="badge bg-danger-subtle text-danger me-2">
                     {{ $schedule['seats_left'] }} Seats Left
@@ -152,6 +171,96 @@ $matchingReturn = $returnSchedules->firstWhere('bus.agency_id', $schedule['bus']
     </div>
 </div>
 </a>
+
+<!-- Stops Modal -->
+@if(isset($schedule['stops']) && count($schedule['stops']) > 0)
+<div class="modal fade" id="stopsModal{{ $schedule['id'] }}" tabindex="-1" aria-labelledby="stopsModalLabel{{ $schedule['id'] }}" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="stopsModalLabel{{ $schedule['id'] }}">
+                    <i class="fas fa-route me-2"></i>Route Stops
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div class="list-group list-group-flush">
+                    <!-- Origin -->
+                    <div class="list-group-item">
+                        <div class="d-flex align-items-start">
+                            <div class="me-3">
+                                <div class="bg-success rounded-circle p-2">
+                                    <i class="fas fa-play text-white" style="font-size: 0.75rem;"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 fw-bold">{{ $schedule['pickup'] }}</h6>
+                                <p class="mb-0 small text-muted">
+                                    <i class="far fa-clock me-1"></i>{{ $schedule['departure_time'] }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Intermediate Stops -->
+                    @foreach($schedule['stops'] as $index => $stop)
+                    <div class="list-group-item">
+                        <div class="d-flex align-items-start">
+                            <div class="me-3">
+                                <div class="bg-primary rounded-circle p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
+                                    <span class="text-white fw-bold" style="font-size: 0.75rem;">{{ $index + 1 }}</span>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">{{ $stop['stop_name'] ?? $stop['name'] }}</h6>
+                                <div class="small text-muted">
+                                    @if(isset($stop['arrival_time']) && $stop['arrival_time'])
+                                        <span class="me-3">
+                                            <i class="fas fa-arrow-down me-1"></i>Arrival: {{ \Carbon\Carbon::parse($stop['arrival_time'])->format('H:i') }}
+                                        </span>
+                                    @endif
+                                    @if(isset($stop['departure_time']) && $stop['departure_time'])
+                                        <span>
+                                            <i class="fas fa-arrow-up me-1"></i>Departure: {{ \Carbon\Carbon::parse($stop['departure_time'])->format('H:i') }}
+                                        </span>
+                                    @endif
+                                    @if(isset($stop['duration']) && $stop['duration'])
+                                        <div class="mt-1">
+                                            <i class="fas fa-hourglass-half me-1"></i>Stop duration: {{ $stop['duration'] }} min
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    @endforeach
+                    
+                    <!-- Destination -->
+                    <div class="list-group-item">
+                        <div class="d-flex align-items-start">
+                            <div class="me-3">
+                                <div class="bg-danger rounded-circle p-2">
+                                    <i class="fas fa-stop text-white" style="font-size: 0.75rem;"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1 fw-bold">{{ $schedule['dropoff'] }}</h6>
+                                <p class="mb-0 small text-muted">
+                                    <i class="far fa-clock me-1"></i>{{ $schedule['arrival_time'] }}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
 @endforeach
 @endif
 
