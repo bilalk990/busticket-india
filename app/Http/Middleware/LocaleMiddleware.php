@@ -23,7 +23,7 @@ class LocaleMiddleware
 
 
         if (!$locale) {
-            // Cache IP-based locale detection for 24 hours (skip if Redis not available)
+            // Cache IP-based locale detection for 24 hours (skip if cache not available)
             try {
                 $locale = Cache::remember('user_locale_' . $request->ip(), 86400, function () {
                     try {

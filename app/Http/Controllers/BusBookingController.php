@@ -1359,12 +1359,17 @@ class BusBookingController extends Controller
         $userEmail = Auth::user()->email;
 
         // Forget stale cache so data is always fresh
-        Cache::forget('user_dashboard_' . $userEmail);
+        try {
+            Cache::forget('user_dashboard_' . $userEmail);
+        } catch (\Exception $e) {
+            \Log::warning('Cache forget failed: ' . $e->getMessage());
+        }
 
         // Cache user dashboard data for 5 minutes
-        $dashboardData = Cache::remember('user_dashboard_' . $userEmail, 300, function () use ($userEmail) {
-            // Get total bookings
-            $totalBookings = BusBooking::where('contact_email', $userEmail)->count();
+        try {
+            $dashboardData = Cache::remember('user_dashboard_' . $userEmail, 300, function () use ($userEmail) {
+                // Get total bookings
+                $totalBookings = BusBooking::where('contact_email', $userEmail)->count();
 
             // Get upcoming bookings (confirmed and not past departure date)
             $upcomingBookings = BusBooking::with([
@@ -1469,6 +1474,20 @@ class BusBookingController extends Controller
                 'userBids' => $userBids
             ];
         });
+        } catch (\Exception $e) {
+            \Log::warning('Cache failed for user dashboard: ' . $e->getMessage());
+            // Fallback: fetch data directly without cache
+            $dashboardData = [
+                'totalBookings' => BusBooking::where('contact_email', $userEmail)->count(),
+                'upcomingTrips' => 0,
+                'completedTrips' => 0,
+                'canceledTrips' => 0,
+                'totalSpent' => 0,
+                'recentBookings' => collect([]),
+                'userResales' => collect([]),
+                'userBids' => collect([])
+            ];
+        }
 
         return view('account.dashboard', $dashboardData);
     }
