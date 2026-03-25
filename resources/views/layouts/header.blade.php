@@ -153,7 +153,11 @@
 								<div class="dropdown-divider"></div>
 								<div class="notification-list">
 									@php
-										$notifications = \App\Models\Notification::forUser(auth()->id())->orderBy('created_at', 'desc')->limit(5)->get();
+										try {
+											$notifications = \App\Models\Notification::forUser(auth()->id())->orderBy('created_at', 'desc')->limit(5)->get();
+										} catch (\Exception $e) {
+											$notifications = collect();
+										}
 									@endphp
 									@forelse($notifications as $notif)
 										<a href="#" class="dropdown-item notification-item {{ is_null($notif->read_at) ? 'fw-semibold' : '' }}"
@@ -730,7 +734,13 @@ function markNotifRead(id, el) {
     @auth
       <a href="#" title="Notifications" id="mobileNotifBell" style="position:relative;">
         <i class="bi bi-bell"></i>
-        @php $mobileUnreadCount = \App\Models\Notification::forUser(auth()->id())->whereNull('read_at')->count(); @endphp
+        @php 
+			try {
+				$mobileUnreadCount = \App\Models\Notification::forUser(auth()->id())->whereNull('read_at')->count();
+			} catch (\Exception $e) {
+				$mobileUnreadCount = 0;
+			}
+		@endphp
         @if($mobileUnreadCount > 0)
           <span class="notification-badge" style="position:absolute;top:0;right:-2px;background:#d00;color:#fff;font-size:0.7rem;padding:2px 5px;border-radius:10px;line-height:1;">{{ $mobileUnreadCount > 9 ? '9+' : $mobileUnreadCount }}</span>
         @endif
