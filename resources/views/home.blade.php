@@ -844,8 +844,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .modern-partners-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 2.5rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+    .modern-partners-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .modern-partner-card {

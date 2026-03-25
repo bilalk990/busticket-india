@@ -63,15 +63,21 @@ class AppServiceProvider extends ServiceProvider
         $backendUrl = rtrim(env('BACKEND_URL', 'http://localhost:5000'), '/');
         view()->share('adminAssetPath', $backendUrl . '/uploads');
 
-        // Blade directive for agency logos
+        // Blade directive for agency logos with better fallback
         Blade::directive('agencyLogo', function ($expression) {
             return "<?php 
                 \$logo = $expression;
-                \$adminAssetPath = rtrim(env('BACKEND_URL', 'http://localhost:5000'), '/') . '/uploads';
-                if (\$logo && !str_starts_with(\$logo, 'http')) {
-                    echo \$adminAssetPath . '/' . \$logo;
+                \$backendUrl = env('BACKEND_URL', 'https://web-production-48746.up.railway.app');
+                \$adminAssetPath = rtrim(\$backendUrl, '/') . '/uploads';
+                
+                if (\$logo) {
+                    if (str_starts_with(\$logo, 'http')) {
+                        echo \$logo;
+                    } else {
+                        echo \$adminAssetPath . '/' . \$logo;
+                    }
                 } else {
-                    echo \$logo ?: 'https://ui-avatars.com/api/?name=Agency&background=f1f5f9&color=1e293b&size=128&bold=true';
+                    echo 'https://ui-avatars.com/api/?name=Agency&background=f1f5f9&color=1e293b&size=128&bold=true';
                 }
             ?>";
         });
