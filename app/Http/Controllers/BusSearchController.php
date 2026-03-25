@@ -273,7 +273,8 @@ class BusSearchController extends Controller
             $schedules = BusSchedules::with([
                 'bus.agency:id,agency_name,agency_logo',
                 'bus.layout:id,name,layout_type,total_seats',
-                'route:id,origin,destination'
+                'route:id,origin,destination',
+                'route.stops' // Load stops with route
             ])
             ->select('id', 'route_id', 'bus_id', 'departure_date', 'departure_time', 'arrival_time', 'status')
             ->whereIn('route_id', $matchingFares->pluck('route_id'))
@@ -347,6 +348,7 @@ class BusSearchController extends Controller
                     'amenities' => $this->parseAmenities($schedule->bus->facilities ?? []),
                     'bus' => $schedule->bus ? $schedule->bus->toArray() : [],
                     'route' => $schedule->route,
+                    'stops' => $schedule->route->stops ?? collect(), // Add stops here
                     'convertedFare' => $this->convertCurrency(
                         $fare->amount,
                         $fare->currency,
@@ -378,7 +380,8 @@ class BusSearchController extends Controller
                     $returnSchedules = BusSchedules::with([
                         'bus.agency:id,agency_name,agency_logo',
                         'bus.layout:id,name,layout_type,total_seats',
-                        'route:id,origin,destination'
+                        'route:id,origin,destination',
+                        'route.stops' // Load stops with route
                     ])
                     ->select('id', 'route_id', 'bus_id', 'departure_date', 'departure_time', 'arrival_time', 'status')
                     ->whereIn('route_id', $returnMatchingFares->pluck('route_id'))
@@ -424,6 +427,7 @@ class BusSearchController extends Controller
                             'amenities' => $this->parseAmenities($schedule->bus->facilities ?? []),
                             'bus' => $schedule->bus ? $schedule->bus->toArray() : [],
                             'route' => $schedule->route,
+                            'stops' => $schedule->route->stops ?? collect(), // Add stops here
                             'convertedFare' => $this->convertCurrency(
                                 $fare->amount,
                                 $fare->currency,
