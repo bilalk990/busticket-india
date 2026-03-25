@@ -132,7 +132,13 @@
 						<li class="nav-item dropdown">
 							<a class="nav-link modern-notification" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" data-bs-auto-close="outside">
 								<i class="bi bi-bell"></i>
-								@php $unreadCount = \App\Models\Notification::forUser(auth()->id())->whereNull('read_at')->count(); @endphp
+								@php 
+									try {
+										$unreadCount = \App\Models\Notification::forUser(auth()->id())->whereNull('read_at')->count();
+									} catch (\Exception $e) {
+										$unreadCount = 0;
+									}
+								@endphp
 								@if($unreadCount > 0)
 									<span class="notification-badge">{{ $unreadCount > 9 ? '9+' : $unreadCount }}</span>
 								@endif
