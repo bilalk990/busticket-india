@@ -19,7 +19,7 @@
                     <div class="pro-agency-stats d-flex flex-row gap-2 justify-content-center">
                         <div class="pro-agency-stat-pill">
                             <i class="bi bi-geo-alt-fill me-1"></i>
-                            <span>{{ count($fares) }}</span>
+                            <span>{{ $agency->routes->count() }}</span>
                             <small>Routes</small>
                         </div>
                         <div class="pro-agency-stat-pill">
@@ -386,7 +386,7 @@
                                                 <i class="bi bi-route"></i>
                                             </div>
                                             <div class="stat-content">
-                                                <div class="stat-value">{{ $fares->count() }}</div>
+                                                <div class="stat-value">{{ $agency->routes->count() }}</div>
                                                 <div class="stat-label">Active Routes</div>
                                             </div>
                                         </div>
@@ -824,7 +824,7 @@
                         </div>
                         <div class="route-stats">
                             <div class="route-stat-item">
-                                <div class="route-stat-value">{{ count($fares) }}</div>
+                                <div class="route-stat-value">{{ $agency->routes->count() }}</div>
                                 <div class="route-stat-label">Active Routes</div>
                             </div>
                             <div class="route-stat-item">
