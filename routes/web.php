@@ -37,6 +37,20 @@ use SimpleSoftwareIO\QrCode\Facades\QrCode;
 */
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
+
+// Manual cache clear route (access via: https://your-domain.com/clear-all-cache)
+Route::get('/clear-all-cache', function () {
+    try {
+        \Illuminate\Support\Facades\Cache::flush();
+        \Illuminate\Support\Facades\Cache::forget('agencies_with_routes');
+        \Illuminate\Support\Facades\Artisan::call('cache:clear');
+        \Illuminate\Support\Facades\Artisan::call('config:clear');
+        return response()->json(['success' => true, 'message' => 'All caches cleared! Deleted companies removed from homepage.']);
+    } catch (\Exception $e) {
+        return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+    }
+});
+
 Route::get('/events', [EventController::class, 'index'])->name('event.list');
 Route::get('/taxi', [TaxiController::class, 'index'])->name('taxi');
 Route::get('/about', [App\Http\Controllers\AboutController::class, 'index'])->name('about.index');

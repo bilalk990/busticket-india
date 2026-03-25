@@ -14,9 +14,9 @@ class HomeController extends Controller
 {
     public function index()
     {
-        // Cache agencies with routes count for 1 hour - only show active agencies
+        // Cache agencies with routes count for 5 minutes (reduced from 1 hour) - only show active agencies
         try {
-            $agencies = Cache::remember('agencies_with_routes', 3600, function () {
+            $agencies = Cache::remember('agencies_with_routes', 300, function () {
                 return BusAgency::where('is_active', true)
                     ->orWhereNull('is_active') // Include agencies where is_active is null (for backward compatibility)
                     ->withCount('routes')
