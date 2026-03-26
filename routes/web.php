@@ -51,6 +51,19 @@ Route::get('/clear-all-cache', function () {
     }
 });
 
+Route::get('/debug-db/{agency_id}', function ($agency_id) {
+    $agency = \App\Models\BusAgency::find($agency_id);
+    if (!$agency) return response()->json(['error' => 'Agency not found']);
+    
+    return response()->json([
+        'agency' => $agency,
+        'routes' => \App\Models\BusRoutes::where('agency_id', $agency_id)->get(),
+        'fares' => \App\Models\BusFare::where('agency_id', $agency_id)->with(['pickupPoint', 'dropoffPoint'])->get(),
+        'points' => \App\Models\BusPoint::where('agency_id', $agency_id)->get(),
+        'schedules' => \App\Models\BusSchedules::where('agency_id', $agency_id)->get(),
+    ]);
+});
+
 Route::get('/events', [EventController::class, 'index'])->name('event.list');
 Route::get('/taxi', [TaxiController::class, 'index'])->name('taxi');
 Route::get('/about', [App\Http\Controllers\AboutController::class, 'index'])->name('about.index');
