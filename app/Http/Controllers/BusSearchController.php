@@ -328,8 +328,8 @@ class BusSearchController extends Controller
                     return null;
                 }
 
-                $departureTime = Carbon::parse($fare->departure_time);
-                $arrivalTime = Carbon::parse($fare->arrival_time);
+                $departureTime = Carbon::parse($schedule->departure_time);
+                $arrivalTime = Carbon::parse($schedule->arrival_time);
 
                 // Calculate seats left
                 $totalSeats = $schedule->bus->layout->total_seats ?? 0;
@@ -407,8 +407,8 @@ class BusSearchController extends Controller
                             return null;
                         }
 
-                        $departureTime = Carbon::parse($fare->departure_time);
-                        $arrivalTime = Carbon::parse($fare->arrival_time);
+                        $departureTime = Carbon::parse($schedule->departure_time);
+                        $arrivalTime = Carbon::parse($schedule->arrival_time);
 
                         // Calculate seats left
                         $totalSeats = $schedule->bus->layout->total_seats ?? 0;
