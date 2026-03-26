@@ -51,6 +51,16 @@ Route::get('/clear-all-cache', function () {
     }
 });
 
+Route::get('/debug-db', function () {
+    return response()->json([
+        'db_host' => config('database.connections.mysql.host'),
+        'db_name' => config('database.connections.mysql.database'),
+        'agencies' => \Illuminate\Support\Facades\DB::table('bus_agencies')->select('id','agency_name','is_active')->get(),
+        'fares' => \Illuminate\Support\Facades\DB::table('bus_fares')->get(),
+        'points' => \Illuminate\Support\Facades\DB::table('bus_points')->select('id','name')->get(),
+    ]);
+});
+
 // Debug route - check live database data
 Route::get('/debug-db', function () {
     $agencies = \Illuminate\Support\Facades\DB::table('bus_agencies')->select('id','agency_name','is_active')->get();
