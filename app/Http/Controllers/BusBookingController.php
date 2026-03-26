@@ -663,13 +663,14 @@ class BusBookingController extends Controller
                 
                 // Create a real bus_schedules record
                 $realSchedule = BusSchedules::create([
-                    'route_id' => $routeId,
-                    'bus_id' => $bus ? $bus->id : null,
-                    'agency_id' => $route->agency_id,
+                    'route_id'       => $routeId,
+                    'bus_id'         => $bus ? $bus->id : null,
+                    'agency_id'      => $route->agency_id,
                     'departure_date' => now()->addDay()->format('Y-m-d'),
                     'departure_time' => $fare ? $fare->departure_time : '08:00:00',
-                    'arrival_time' => $fare ? $fare->arrival_time : '16:00:00',
-                    'status' => 'scheduled',
+                    'arrival_time'   => $fare ? $fare->arrival_time : '16:00:00',
+                    'price'          => $data['outboundPrice'] ?? 0,
+                    'status'         => 'scheduled',
                 ]);
                 $scheduleId = $realSchedule->id;
                 $agencyId = $route->agency_id;
@@ -849,11 +850,8 @@ class BusBookingController extends Controller
                 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Test Payment error: ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-                'scheduleId' => $scheduleId ?? null,
-            ]);
-            return redirect()->back()
+            Log::error('Test Payment error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            return redirect()->route('home')
                 ->with('error', 'Booking failed: ' . $e->getMessage());
         }
     }
