@@ -6,21 +6,22 @@ echo "🚀 Starting FastBuss Server..."
 echo "📁 Setting permissions..."
 chmod -R 755 storage bootstrap/cache 2>/dev/null || true
 
-# Clear and optimize
-echo "🧹 Clearing caches..."
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
-php artisan cache:clear
+# Clear old caches first
+echo "🧹 Clearing old caches..."
+php artisan config:clear 2>/dev/null || true
+php artisan route:clear 2>/dev/null || true
+php artisan view:clear 2>/dev/null || true
+php artisan cache:clear 2>/dev/null || true
 
-echo "⚡ Optimizing..."
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
+# Now optimize (this runs after clearing, so no conflicts)
+echo "⚡ Optimizing application..."
+php artisan config:cache 2>/dev/null || echo "⚠️  Config cache skipped"
+php artisan route:cache 2>/dev/null || echo "⚠️  Route cache skipped"
+php artisan view:cache 2>/dev/null || echo "⚠️  View cache skipped"
 
 # Check database connection
 echo "🔍 Checking database connection..."
-php artisan migrate:status || echo "⚠️  Database connection issue detected"
+php artisan migrate:status 2>/dev/null || echo "⚠️  Database connection issue detected"
 
 # Start server
 echo "✅ Starting PHP server on port ${PORT:-8080}..."
