@@ -52,12 +52,23 @@ Route::get('/clear-all-cache', function () {
 });
 
 Route::get('/debug-db', function () {
+    $fares = \Illuminate\Support\Facades\DB::table('bus_fares as bf')
+        ->leftJoin('bus_points as bp1', 'bf.pickup', '=', 'bp1.id')
+        ->leftJoin('bus_points as bp2', 'bf.dropoff', '=', 'bp2.id')
+        ->select('bf.id','bf.agency_id','bf.pickup','bf.dropoff','bp1.name as pickup_name','bp2.name as dropoff_name')
+        ->get();
+    
+    $points = \Illuminate\Support\Facades\DB::table('bus_points')->get();
+    $agencies = \Illuminate\Support\Facades\DB::table('bus_agencies')->select('id','agency_name','is_active')->get();
+    $schedules = \Illuminate\Support\Facades\DB::table('bus_schedules')->select('id','agency_id','route_id','departure_time','arrival_time')->limit(5)->get();
+    
     return response()->json([
         'db_host' => config('database.connections.mysql.host'),
         'db_name' => config('database.connections.mysql.database'),
-        'agencies' => \Illuminate\Support\Facades\DB::table('bus_agencies')->select('id','agency_name','is_active')->get(),
-        'fares' => \Illuminate\Support\Facades\DB::table('bus_fares')->get(),
-        'points' => \Illuminate\Support\Facades\DB::table('bus_points')->select('id','name')->get(),
+        'agencies' => $agencies,
+        'bus_points' => $points,
+        'fares_with_join' => $fares,
+        'schedules' => $schedules,
     ]);
 });
 
