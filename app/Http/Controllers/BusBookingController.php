@@ -774,7 +774,7 @@ class BusBookingController extends Controller
                     'type'    => 'bus_booking',
                     'title'   => 'Booking Confirmed',
                     'message' => "Booking {$bookingreference} confirmed.",
-                    'data'    => json_encode(['booking_reference' => $bookingreference]),
+                    'data'    => ['booking_reference' => $bookingreference],
                 ]);
             } catch (\Exception $notifEx) {
                 Log::warning('Notification create failed: ' . $notifEx->getMessage());
@@ -797,6 +797,7 @@ class BusBookingController extends Controller
 
             DB::commit();
             Session::forget(['tx_ref', 'booking_data']);
+            \Illuminate\Support\Facades\Cache::store('database')->forget('booking_' . $bookingreference);
 
             Log::info('Test Payment - SUCCESS: booking ' . $booking->id . ' ref ' . $bookingreference);
 
