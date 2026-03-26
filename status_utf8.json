@@ -1,0 +1,182 @@
+﻿{
+  "id": "6cebbd4d-46c4-43f7-b7a9-dedd90ea9ac9",
+  "name": "precious-reflection",
+  "deletedAt": null,
+  "workspace": {
+    "name": "bilalk990's Projects"
+  },
+  "buckets": {
+    "edges": []
+  },
+  "environments": {
+    "edges": [
+      {
+        "node": {
+          "id": "1e7cd7fb-bf1e-4864-b82f-bfb0bb1a1e8e",
+          "name": "production",
+          "canAccess": true,
+          "deletedAt": null,
+          "unmergedChangesCount": null,
+          "serviceInstances": {
+            "edges": [
+              {
+                "node": {
+                  "id": "6c47611e-0b2d-46cd-beca-8dbf412abf6d",
+                  "serviceId": "c5630d6b-5235-4cb9-8da8-2871fd86e9e5",
+                  "serviceName": "MySQL",
+                  "environmentId": "1e7cd7fb-bf1e-4864-b82f-bfb0bb1a1e8e",
+                  "latestDeployment": {
+                    "canRedeploy": true,
+                    "id": "cbdf82ad-f365-4c12-97f2-0d228fc21706",
+                    "meta": {
+                      "image": "mysql:9.4",
+                      "imageDigest": "sha256:135bc87cce147c3d28cecb9ad270b814cb52805af7ddeea83bfcaf157d05a6b2",
+                      "logsV2": true,
+                      "patchId": "768ecf75-9f8e-408f-adb0-5fbdfae48fdc",
+                      "reason": "deploy",
+                      "runtime": "V2",
+                      "serviceManifest": {
+                        "build": {
+                          "buildCommand": null,
+                          "buildEnvironment": null,
+                          "builder": "RAILPACK",
+                          "dockerfilePath": null,
+                          "nixpacksConfigPath": null,
+                          "nixpacksPlan": null,
+                          "watchPatterns": []
+                        },
+                        "deploy": {
+                          "cronSchedule": null,
+                          "drainingSeconds": null,
+                          "healthcheckPath": null,
+                          "healthcheckTimeout": null,
+                          "ipv6EgressEnabled": false,
+                          "limitOverride": null,
+                          "multiRegionConfig": {
+                            "asia-southeast1-eqsg3a": {
+                              "numReplicas": 1
+                            }
+                          },
+                          "numReplicas": 1,
+                          "overlapSeconds": null,
+                          "preDeployCommand": null,
+                          "region": null,
+                          "registryCredentials": null,
+                          "requiredMountPath": "/var/lib/mysql",
+                          "restartPolicyMaxRetries": 10,
+                          "restartPolicyType": "ON_FAILURE",
+                          "runtime": "V2",
+                          "sleepApplication": false,
+                          "startCommand": "docker-entrypoint.sh mysqld --innodb-use-native-aio=0 --disable-log-bin --performance_schema=0 --innodb-buffer-pool-size=1G",
+                          "useLegacyStacker": false
+                        }
+                      },
+                      "volumeMounts": [
+                        "/var/lib/mysql"
+                      ]
+                    },
+                    "status": "SUCCESS",
+                    "createdAt": "2026-03-24T17:33:20.880Z",
+                    "deploymentStopped": false
+                  },
+                  "activeDeployments": [
+                    {
+                      "id": "cbdf82ad-f365-4c12-97f2-0d228fc21706",
+                      "status": "SUCCESS",
+                      "createdAt": "2026-03-24T17:33:20.880Z",
+                      "meta": {
+                        "image": "mysql:9.4",
+                        "imageDigest": "sha256:135bc87cce147c3d28cecb9ad270b814cb52805af7ddeea83bfcaf157d05a6b2",
+                        "logsV2": true,
+                        "patchId": "768ecf75-9f8e-408f-adb0-5fbdfae48fdc",
+                        "reason": "deploy",
+                        "runtime": "V2",
+                        "serviceManifest": {
+                          "build": {
+                            "buildCommand": null,
+                            "buildEnvironment": null,
+                            "builder": "RAILPACK",
+                            "dockerfilePath": null,
+                            "nixpacksConfigPath": null,
+                            "nixpacksPlan": null,
+                            "watchPatterns": []
+                          },
+                          "deploy": {
+                            "cronSchedule": null,
+                            "drainingSeconds": null,
+                            "healthcheckPath": null,
+                            "healthcheckTimeout": null,
+                            "ipv6EgressEnabled": false,
+                            "limitOverride": null,
+                            "multiRegionConfig": {
+                              "asia-southeast1-eqsg3a": {
+                                "numReplicas": 1
+                              }
+                            },
+                            "numReplicas": 1,
+                            "overlapSeconds": null,
+                            "preDeployCommand": null,
+                            "region": null,
+                            "registryCredentials": null,
+                            "requiredMountPath": "/var/lib/mysql",
+                            "restartPolicyMaxRetries": 10,
+                            "restartPolicyType": "ON_FAILURE",
+                            "runtime": "V2",
+                            "sleepApplication": false,
+                            "startCommand": "docker-entrypoint.sh mysqld --innodb-use-native-aio=0 --disable-log-bin --performance_schema=0 --innodb-buffer-pool-size=1G",
+                            "useLegacyStacker": false
+                          }
+                        },
+                        "volumeMounts": [
+                          "/var/lib/mysql"
+                        ]
+                      }
+                    }
+                  ],
+                  "source": {
+                    "repo": null,
+                    "image": "mysql:9.4"
+                  },
+                  "domains": {
+                    "serviceDomains": [],
+                    "customDomains": []
+                  },
+                  "cronSchedule": null,
+                  "nextCronRunAt": null,
+                  "startCommand": "docker-entrypoint.sh mysqld --innodb-use-native-aio=0 --disable-log-bin --performance_schema=0 --innodb-buffer-pool-size=1G"
+                }
+              }
+            ]
+          },
+          "volumeInstances": {
+            "edges": [
+              {
+                "node": {
+                  "serviceId": "c5630d6b-5235-4cb9-8da8-2871fd86e9e5",
+                  "mountPath": "/var/lib/mysql",
+                  "environmentId": "1e7cd7fb-bf1e-4864-b82f-bfb0bb1a1e8e",
+                  "currentSizeMB": 305.09465600000004,
+                  "sizeMB": 5000,
+                  "volume": {
+                    "name": "mysql-volume",
+                    "id": "852c383a-ec6b-469c-9822-531c975ca9fc"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "services": {
+    "edges": [
+      {
+        "node": {
+          "id": "c5630d6b-5235-4cb9-8da8-2871fd86e9e5",
+          "name": "MySQL"
+        }
+      }
+    ]
+  }
+}

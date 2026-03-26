@@ -231,155 +231,149 @@ class BusBookingController extends Controller
     public function passengerDetails(Request $request, $scheduleId)
     {
         try {
-            Log::info('passengerDetails called with scheduleId: ' . $scheduleId);
-
-            // Handle virtual schedule IDs (route_X)
             $isVirtual = str_starts_with($scheduleId, 'route_');
 
-            if ($request->isMethod('post')) {
-                // Validate form data
-                $validatedData = $request->validate([
-                    'seats_outbound' => 'required|string',
-                    'seats_return' => 'nullable|string',
-                    'return_schedule_id' => 'nullable|string',
-                    'outbound_price' => 'required|numeric',
-                    'return_price' => 'nullable|numeric',
-                    'currency' => 'required|string',
-                    'pickup' => 'required|string',
-                    'dropoff' => 'required|string',
-                    'baggage_fee' => 'nullable|numeric|min:0',
-                    'extra_bags_fee' => 'nullable|numeric|min:0',
-                    'overweight_fee' => 'nullable|numeric|min:0',
-                    'bags_per_passenger' => 'nullable|integer|min:0',
-                    'bag_weight' => 'nullable|numeric|min:0',
-                ]);
-
-                // Get selected seats
-                $outboundSeats = explode(',', $request->input('seats_outbound', ''));
-                if (empty($outboundSeats) || $outboundSeats[0] === '') {
-                    return redirect()->back()->with('error', 'You must select at least one seat!');
-                }
-
-                // Handle virtual or real schedule
-                if ($isVirtual) {
-                    $routeId = str_replace('route_', '', $scheduleId);
-                    $route = \App\Models\BusRoutes::with(['agency'])->find($routeId);
-                    if (!$route) {
-                        return redirect()->back()->with('error', 'Route not found.');
-                    }
-
-                    // Create virtual schedule
-                    $schedule = (object)[
-                        'id' => $scheduleId,
-                        'route_id' => $routeId,
-                        'departure_time' => '08:00:00',
-                        'arrival_time' => '16:00:00',
-                        'departure_date' => now()->addDay()->format('Y-m-d'),
-                        'route' => $route,
-                        'bus' => (object)[
-                            'id' => null,
-                            'name' => 'Standard Bus',
-                            'plate_number' => 'N/A',
-                            'agency_id' => $route->agency_id,
-                            'agency' => (object)[
-                                'id' => $route->agency_id,
-                                'agency_name' => $route->agency->agency_name ?? 'Bus Operator',
-                                'agency_logo' => $route->agency->agency_logo ?? null,
-                            ],
-                            'layout' => (object)[
-                                'id' => null,
-                                'name' => 'Standard',
-                                'layout_type' => '2x2',
-                                'total_seats' => 40,
-                            ],
-                        ],
-                    ];
-
-                } else {
-                    $schedule = \App\Models\BusSchedules::with(['route', 'bus.agency'])->findOrFail($scheduleId);
-                }
-
-                // Calculate prices
-                $outboundPrice = $request->input('outbound_price') * count($outboundSeats);
-                $returnPrice = $request->input('return_price', 0) * count(explode(',', $request->input('seats_return', '')));
-                $totalPrice = $outboundPrice + $returnPrice + $request->input('baggage_fee', 0);
-
-                // Get countries and user data
-                $countries = \App\Models\Country::orderBy('country_name')->get();
-                $user = auth()->guard('customer')->user();
-                $userData = $user ? [
-                    'name' => $user->name,
-                    'email' => $user->email,
-                    'phone' => $user->phone,
-                ] : null;
-
-                // Get agency document types
-                $agencyDocumentTypes = \App\Models\AgencyDocumentType::where('agency_id', $route->agency_id ?? ($schedule->bus->agency_id ?? 0))
-                    ->where('status', 'active')
-                    ->get();
-
-                // Calculate Markup Fee
-                $markupFee = \App\Models\MarkupFee::where('status', 'active')->first();
-                $markupAmount = 0;
-                $markupLabel = null;
-                $markupType = null;
-                $markupPerSeat = 0;
-
-                if ($markupFee) {
-                    $markupLabel = $markupFee->name;
-                    $markupType = $markupFee->type;
-                    if ($markupFee->type === 'percentage') {
-                        $markupPerSeat = ($outboundPrice / count($outboundSeats)) * ($markupFee->amount / 100);
-                    } else {
-                        $markupPerSeat = $markupFee->amount;
-                    }
-                    $markupAmount = $markupPerSeat * count($outboundSeats);
-                }
-
-                $totalPrice += $markupAmount;
-
-                return view('bus.booking.passenger_details', [
-                    'schedule' => $schedule,
-                    'scheduleId' => $scheduleId,
-                    'returnSchedule' => null,
-                    'returnScheduleId' => $request->input('return_schedule_id'),
-                    'outboundSeats' => $outboundSeats,
-                    'returnSeats' => explode(',', $request->input('seats_return', '')),
-                    'outboundPrice' => $outboundPrice,
-                    'returnPrice' => $returnPrice,
-                    'totalPrice' => $totalPrice,
-                    'currency' => $request->input('currency'),
-                    'pickup' => $request->input('pickup'),
-                    'dropoff' => $request->input('dropoff'),
-                    'agencyDocumentTypes' => $agencyDocumentTypes,
-                    'countries' => $countries,
-                    'userData' => $userData,
-                    'baggageFee' => $request->input('baggage_fee', 0),
-                    'extraBagsFee' => $request->input('extra_bags_fee', 0),
-                    'overweightFee' => $request->input('overweight_fee', 0),
-                    'bagsPerPassenger' => $request->input('bags_per_passenger', 1),
-                    'bagWeight' => $request->input('bag_weight', 0),
-                    'markupAmount' => $markupAmount,
-                    'markupLabel' => $markupLabel,
-                    'markupType' => $markupType,
-                    'markupOriginalCurrency' => $currency,
-                    'markupPerSeat' => $markupPerSeat,
-                    'totalSeats' => count($outboundSeats),
-                ]);
+            if (!$request->isMethod('post')) {
+                return redirect()->back();
             }
 
-            // GET request - redirect to seat selection
-            return redirect()->route('bus.seatSelection', ['pickup' => 'default', 'dropoff' => 'default', 'scheduleId' => $scheduleId]);
+            $request->validate([
+                'seats_outbound' => 'required|string',
+                'seats_return' => 'nullable|string',
+                'return_schedule_id' => 'nullable|string',
+                'outbound_price' => 'required|numeric',
+                'return_price' => 'nullable|numeric',
+                'currency' => 'required|string',
+                'pickup' => 'required|string',
+                'dropoff' => 'required|string',
+                'baggage_fee' => 'nullable|numeric|min:0',
+                'extra_bags_fee' => 'nullable|numeric|min:0',
+                'overweight_fee' => 'nullable|numeric|min:0',
+                'bags_per_passenger' => 'nullable|integer|min:0',
+                'bag_weight' => 'nullable|numeric|min:0',
+            ]);
+
+            $outboundSeats = array_filter(explode(',', $request->input('seats_outbound', '')));
+            if (empty($outboundSeats)) {
+                return redirect()->back()->with('error', 'You must select at least one seat!');
+            }
+            $outboundSeats = array_values($outboundSeats);
+
+            $returnSeatsRaw = $request->input('seats_return', '');
+            $returnSeats = $returnSeatsRaw ? array_filter(explode(',', $returnSeatsRaw)) : [];
+            $returnSeats = array_values($returnSeats);
+
+            $agencyId = 0;
+
+            if ($isVirtual) {
+                $routeId = str_replace('route_', '', $scheduleId);
+                $route = \App\Models\BusRoutes::with(['agency'])->find($routeId);
+                if (!$route) {
+                    return redirect()->back()->with('error', 'Route not found.');
+                }
+                $agencyId = $route->agency_id ?? 0;
+                $schedule = (object)[
+                    'id'             => $scheduleId,
+                    'route_id'       => $routeId,
+                    'departure_time' => '08:00:00',
+                    'arrival_time'   => '16:00:00',
+                    'departure_date' => now()->addDay()->format('Y-m-d'),
+                    'route'          => $route,
+                    'bus'            => (object)[
+                        'id'        => null,
+                        'name'      => 'Standard Bus',
+                        'agency_id' => $agencyId,
+                        'agency'    => (object)[
+                            'id'          => $agencyId,
+                            'agency_name' => optional($route->agency)->agency_name ?? 'Bus Operator',
+                            'agency_logo' => optional($route->agency)->agency_logo ?? null,
+                        ],
+                    ],
+                ];
+            } else {
+                $schedule = BusSchedules::with(['route', 'bus.agency'])->findOrFail($scheduleId);
+                $agencyId = $schedule->bus->agency_id ?? 0;
+            }
+
+            // Prices
+            $outboundPrice = (float)$request->input('outbound_price') * count($outboundSeats);
+            $returnPrice   = count($returnSeats) ? (float)$request->input('return_price', 0) * count($returnSeats) : 0;
+            $baggageFee    = (float)$request->input('baggage_fee', 0);
+            $totalPrice    = $outboundPrice + $returnPrice + $baggageFee;
+
+            // Markup - uses correct field names: label, value
+            $markup = MarkupFee::where('status', 'active')->first();
+            $markupAmount = 0; $markupLabel = null; $markupType = null;
+            $markupOriginalCurrency = null; $markupPerSeat = 0;
+            $totalSeats = count($outboundSeats) + count($returnSeats);
+            $currency = $request->input('currency', 'USD');
+
+            if ($markup && $totalSeats > 0) {
+                $markupLabel = $markup->label;
+                $markupType  = $markup->type;
+                $markupOriginalCurrency = $markup->currency;
+                $exchangeRates = session('currency')['rates'] ?? [];
+                if (strtolower($markup->type) === 'fixed') {
+                    $markupPerSeat = (float)$markup->value;
+                    if ($markup->currency !== $currency) {
+                        $markupPerSeat = CurrencyHelper::convertCurrency($markup->value, $markup->currency, $currency, $exchangeRates);
+                    }
+                } elseif (strtolower($markup->type) === 'percentage') {
+                    $perSeatFare = $totalSeats > 0 ? ($outboundPrice + $returnPrice) / $totalSeats : 0;
+                    $markupPerSeat = ($perSeatFare * (float)$markup->value) / 100;
+                }
+                $markupAmount = $markupPerSeat * $totalSeats;
+                $totalPrice += $markupAmount;
+            }
+
+            // Agency document types
+            $agencyDocumentTypes = collect();
+            try {
+                $agencyDocumentTypes = \App\Models\AgencyDocumentType::where('agency_id', $agencyId)
+                    ->where('status', 'active')->get();
+            } catch (\Exception $e) {
+                Log::warning('Could not load agency document types: ' . $e->getMessage());
+            }
+
+            $countries = \App\Models\Country::orderBy('country_name')->get();
+            $user = auth()->guard('customer')->user();
+            $userData = $user ? ['name' => $user->name, 'email' => $user->email, 'phone' => $user->phone] : null;
+
+            return view('bus.booking.passenger_details', [
+                'schedule'               => $schedule,
+                'scheduleId'             => $scheduleId,
+                'returnSchedule'         => null,
+                'returnScheduleId'       => $request->input('return_schedule_id'),
+                'outboundSeats'          => $outboundSeats,
+                'returnSeats'            => $returnSeats,
+                'outboundPrice'          => $outboundPrice,
+                'returnPrice'            => $returnPrice,
+                'totalPrice'             => $totalPrice,
+                'currency'               => $currency,
+                'pickup'                 => $request->input('pickup'),
+                'dropoff'                => $request->input('dropoff'),
+                'agencyDocumentTypes'    => $agencyDocumentTypes,
+                'countries'              => $countries,
+                'userData'               => $userData,
+                'baggageFee'             => $baggageFee,
+                'extraBagsFee'           => (float)$request->input('extra_bags_fee', 0),
+                'overweightFee'          => (float)$request->input('overweight_fee', 0),
+                'bagsPerPassenger'       => (int)$request->input('bags_per_passenger', 1),
+                'bagWeight'              => (float)$request->input('bag_weight', 0),
+                'markupAmount'           => $markupAmount,
+                'markupLabel'            => $markupLabel,
+                'markupType'             => $markupType,
+                'markupOriginalCurrency' => $markupOriginalCurrency,
+                'markupPerSeat'          => $markupPerSeat,
+                'totalSeats'             => $totalSeats,
+            ]);
 
         } catch (\Exception $e) {
-            Log::error('Error in passengerDetails: ' . $e->getMessage());
-            Log::error('Stack trace: ' . $e->getTraceAsString());
-            // Return JSON so we can see the exact error in browser
+            Log::error('passengerDetails error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
             return response()->json([
                 'error' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => collect(explode("\n", $e->getTraceAsString()))->take(10)->toArray()
+                'file'  => basename($e->getFile()),
+                'line'  => $e->getLine(),
             ], 500);
         }
     }
