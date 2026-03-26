@@ -590,267 +590,216 @@ class BusBookingController extends Controller
     public function handleTestPayment(Request $request)
     {
         $tx_ref = $request->get('tx_ref');
-        
-        // Log test payment attempt
         Log::info("Test Payment initiated: tx_ref: $tx_ref");
 
-        // Retrieve the session data
         $bookingreference = Session::get('tx_ref');
-        $data = Session::get('booking_data');
-        $scheduleId = $data['schedule_id'] ?? null;
-        $returnScheduleId = $data['return_schedule_id'] ?? null;
-        $pickup = $data['pickup'] ?? null;
-        $dropoff = $data['dropoff'] ?? null;
+        $data             = Session::get('booking_data');
 
-        if ($tx_ref !== $bookingreference) {
-            return redirect()->route('home')
-                ->with('error', 'Session expired. Please start your booking again.');
+        Log::info('Test Payment session data', [
+            'tx_ref_session' => $bookingreference,
+            'tx_ref_request' => $tx_ref,
+            'data_keys'      => $data ? array_keys($data) : 'NULL',
+        ]);
+
+        // Session mismatch or missing
+        if (!$data || !$bookingreference) {
+            Log::error('Test Payment - Session missing or expired');
+            return redirect()->route('home')->with('error', 'Session expired. Please start your booking again.');
         }
 
+        if ($tx_ref !== $bookingreference) {
+            Log::error("Test Payment - tx_ref mismatch: request=$tx_ref session=$bookingreference");
+            return redirect()->route('home')->with('error', 'Invalid payment token. Please try again.');
+        }
+
+        $scheduleId       = $data['schedule_id'] ?? null;
+        $returnScheduleId = $data['return_schedule_id'] ?? null;
+
         try {
-            // Parse selected seats
-            $selectedSeats = explode(',', $data['outboundSeats']);
-            $returnSeats = !empty($data['returnSeats']) ? explode(',', $data['returnSeats']) : [];
-            $contactPhone = $data['contact_phone'] ?? null;
-            $contactEmail = $data['contact_email'] ?? null;
+            $selectedSeats = array_filter(explode(',', $data['outboundSeats'] ?? ''));
+            $returnSeats   = !empty($data['returnSeats']) ? array_filter(explode(',', $data['returnSeats'])) : [];
+            $selectedSeats = array_values($selectedSeats);
+            $returnSeats   = array_values($returnSeats);
+            $contactEmail  = $data['contact_email'] ?? null;
 
-            Log::info('Test Payment - Selected Outbound Seats: ' . implode(', ', $selectedSeats));
-            Log::info('Test Payment - Selected Return Seats: ' . implode(', ', $returnSeats));
-
-            // Check if seats are already booked (skip for virtual routes - real schedule not created yet)
-            if (!str_starts_with($scheduleId, 'route_')) {
-                $bookedSeats = BusPassengers::where('schedule_id', $scheduleId)
-                    ->whereIn('seat', $selectedSeats)
-                    ->pluck('seat')
-                    ->toArray();
-                if (!empty($bookedSeats)) {
-                    return redirect()->route('home')
-                        ->with('error', 'The following outbound seats are already booked: ' . implode(', ', $bookedSeats));
-                }
-
-                if ($returnScheduleId) {
-                    $bookedReturnSeats = BusPassengers::where('schedule_id', $returnScheduleId)
-                        ->whereIn('seat', $returnSeats)
-                        ->pluck('seat')
-                        ->toArray();
-                    if (!empty($bookedReturnSeats)) {
-                        return redirect()->route('home')
-                            ->with('error', 'The following return seats are already booked: ' . implode(', ', $bookedReturnSeats));
-                    }
-                }
+            if (empty($selectedSeats)) {
+                throw new \Exception('No seats selected');
             }
 
             DB::beginTransaction();
 
-            $outboundPrice  = $data['outboundPrice'];
+            $outboundPrice       = (float)($data['outboundPrice'] ?? 0);
+            $returnPrice         = (float)($data['returnPrice'] ?? 0);
             $totalOutboundAmount = $outboundPrice * count($selectedSeats);
-            $returnPrice = $data['returnPrice'] ?? 0;
-            $totalReturnAmount = $returnPrice * count($returnSeats);
-            $totalAmount = $totalOutboundAmount + $totalReturnAmount;
-            
-            // Handle coupon data
-            $couponCode = $data['coupon_code'] ?? null;
-            $discountAmount = $data['discount_amount'] ?? 0;
-            $finalPrice = $data['final_price'] ?? $totalAmount;
-            
-            // Get the schedule to get agency_id
-            // Handle virtual route IDs (route_X) by creating a real schedule record
+            $totalReturnAmount   = $returnPrice * count($returnSeats);
+            $totalAmount         = $totalOutboundAmount + $totalReturnAmount;
+            $couponCode          = $data['coupon_code'] ?? null;
+            $discountAmount      = (float)($data['discount_amount'] ?? 0);
+            $finalPrice          = (float)($data['final_price'] ?? $totalAmount);
+
+            // Handle virtual route IDs - create a real schedule
             if (str_starts_with($scheduleId, 'route_')) {
                 $routeId = str_replace('route_', '', $scheduleId);
-                $route = \App\Models\BusRoutes::with('agency')->find($routeId);
-                $bus = \Illuminate\Support\Facades\DB::table('buses')->where('agency_id', $route->agency_id)->first();
+                $route   = \App\Models\BusRoutes::with('agency')->find($routeId);
+
+                if (!$route) {
+                    throw new \Exception("Route $routeId not found");
+                }
+
+                $bus  = DB::table('buses')->where('agency_id', $route->agency_id)->first();
                 $fare = \App\Models\BusFare::where('route_id', $routeId)->first();
-                
-                // Create a real bus_schedules record
+
                 $realSchedule = BusSchedules::create([
                     'route_id'       => $routeId,
                     'bus_id'         => $bus ? $bus->id : null,
                     'agency_id'      => $route->agency_id,
                     'departure_date' => now()->addDay()->format('Y-m-d'),
                     'departure_time' => $fare ? $fare->departure_time : '08:00:00',
-                    'arrival_time'   => $fare ? $fare->arrival_time : '16:00:00',
-                    'price'          => $data['outboundPrice'] ?? 0,
+                    'arrival_time'   => $fare ? $fare->arrival_time  : '16:00:00',
+                    'price'          => $outboundPrice,
                     'status'         => 'scheduled',
                 ]);
+
+                Log::info('Test Payment - Created real schedule ID: ' . $realSchedule->id);
                 $scheduleId = $realSchedule->id;
-                $agencyId = $route->agency_id;
+                $agencyId   = $route->agency_id;
             } else {
                 $schedule = BusSchedules::with('bus')->find($scheduleId);
-                $agencyId = $schedule ? ($schedule->bus->agency_id ?? null) : null;
+                $agencyId = $schedule?->bus?->agency_id ?? $schedule?->agency_id ?? null;
             }
-            
-            // Initialize passenger details array
-            $passengerDetails = [];
-            
-            // Create booking with TEST PAYMENT status
-            $booking = BusBooking::create([
-                'user_id' => auth()->guard('customer')->id(),
-                'bus_schedule_id' => $scheduleId,
-                'agency_id' => $agencyId,
-                'pickup' => $data['pickup'],
-                'dropoff' => $data['dropoff'],
-                'bookingreference' => $bookingreference,
-                'contact_phone' => $data['contact_phone'],
-                'contact_email' => $data['contact_email'],
-                'total_amount' => $totalAmount,
-                'currency' => session('currency')['code'] ?? 'ZMW',
-                'coupon_code' => $couponCode,
-                'discount_amount' => $discountAmount,
-                'final_price' => $finalPrice,
-                'status' => 'confirmed', // Instantly confirmed for test payment
-                'markup_fee' => $data['markupAmount'] ?? 0,
-            ]);
-            
-            Log::info('Test Payment - Booking created with ID: ' . $booking->id);
 
-            // Create passengers for outbound trip
+            // Create booking
+            $booking = BusBooking::create([
+                'user_id'          => auth()->guard('customer')->id(),
+                'bus_schedule_id'  => $scheduleId,
+                'agency_id'        => $agencyId,
+                'pickup'           => $data['pickup'] ?? '',
+                'dropoff'          => $data['dropoff'] ?? '',
+                'bookingreference' => $bookingreference,
+                'contact_phone'    => $data['contact_phone'] ?? '',
+                'contact_email'    => $contactEmail,
+                'total_amount'     => $totalAmount,
+                'currency'         => $data['currency'] ?? session('currency.code', 'USD'),
+                'coupon_code'      => $couponCode,
+                'discount_amount'  => $discountAmount,
+                'final_price'      => $finalPrice,
+                'status'           => 'confirmed',
+                'markup_fee'       => (float)($data['markupAmount'] ?? 0),
+                'baggage_fee'      => (float)($data['baggage_fee'] ?? 0),
+                'extra_bags_fee'   => (float)($data['extra_bags_fee'] ?? 0),
+                'overweight_fee'   => (float)($data['overweight_fee'] ?? 0),
+                'bags_per_passenger' => (int)($data['bags_per_passenger'] ?? 0),
+                'bag_weight'       => (float)($data['bag_weight'] ?? 0),
+            ]);
+
+            Log::info('Test Payment - Booking created: ' . $booking->id);
+
+            $passengerDetails = [];
+
+            // Create outbound passengers
             foreach ($data['passengers'] as $index => $passengerData) {
-                if (!isset($selectedSeats[$index])) {
-                    throw new \Exception('Outbound seat data mismatch');
+                $seat = $selectedSeats[$index] ?? null;
+                if (!$seat) {
+                    throw new \Exception("Seat missing for passenger index $index");
                 }
-                $seat = $selectedSeats[$index];
+
                 $passenger = BusPassengers::create([
-                    'booking_id' => $booking->id,
+                    'booking_id'  => $booking->id,
                     'schedule_id' => $scheduleId,
-                    'seat' => $seat,
-                    'title' => $passengerData['title'],
-                    'given_name' => $passengerData['given_name'],
-                    'family_name' => $passengerData['family_name'],
-                    'phone' => $passengerData['phone'],
-                    'email' => $passengerData['email'],
-                    'dob' => $passengerData['dob'],
-                    'gender' => $passengerData['gender'],
-                    'seat_price' => $outboundPrice,
+                    'seat'        => $seat,
+                    'title'       => $passengerData['title'] ?? '',
+                    'given_name'  => $passengerData['given_name'] ?? '',
+                    'family_name' => $passengerData['family_name'] ?? '',
+                    'phone'       => $passengerData['phone'] ?? '',
+                    'email'       => $passengerData['email'] ?? '',
+                    'dob'         => $passengerData['dob'] ?? null,
+                    'gender'      => $passengerData['gender'] ?? '',
+                    'seat_price'  => $outboundPrice,
                 ]);
 
-                // Handle identity documents
-                if (isset($passengerData['identity_documents'])) {
-                    foreach ($passengerData['identity_documents'] as $docTypeId => $documentData) {
-                        if (!empty($documentData['type']) && !empty($documentData['unique_identifier'])) {
-                            BusDocuments::create([
-                                'passenger_id' => $passenger->id,
-                                'type' => $documentData['type'],
-                                'unique_identifier' => $documentData['unique_identifier'],
-                                'issuing_country_code' => $documentData['issuing_country_code'] ?? '',
-                                'expires_on' => $documentData['expires_on'] ?? null,
-                            ]);
-                        }
+                // Identity documents
+                $docs = $passengerData['identity_documents'] ?? ($passengerData['identity_document'] ? [$passengerData['identity_document']] : []);
+                foreach ((array)$docs as $docData) {
+                    if (!empty($docData['type']) && !empty($docData['unique_identifier'])) {
+                        BusDocuments::create([
+                            'passenger_id'        => $passenger->id,
+                            'type'                => $docData['type'],
+                            'unique_identifier'   => $docData['unique_identifier'],
+                            'issuing_country_code'=> $docData['issuing_country_code'] ?? '',
+                            'expires_on'          => $docData['expires_on'] ?? null,
+                        ]);
                     }
-                } elseif (isset($passengerData['identity_document'])) {
-                    $documentData = $passengerData['identity_document'];
-                    BusDocuments::create([
-                        'passenger_id' => $passenger->id,
-                        'type' => $documentData['type'],
-                        'unique_identifier' => $documentData['unique_identifier'],
-                        'issuing_country_code' => $documentData['issuing_country_code'],
-                        'expires_on' => $documentData['expires_on'],
-                    ]);
                 }
-                
+
                 $passengerDetails[] = [
-                    'name' => "{$passengerData['given_name']} {$passengerData['family_name']}",
-                    'seat' => $seat,
+                    'name'  => trim(($passengerData['given_name'] ?? '') . ' ' . ($passengerData['family_name'] ?? '')),
+                    'seat'  => $seat,
                     'price' => $outboundPrice,
                 ];
             }
 
-            // Create passengers for return trip if exists
-            if ($returnScheduleId) {
+            // Create return passengers
+            if ($returnScheduleId && !empty($returnSeats)) {
                 foreach ($data['passengers'] as $index => $passengerData) {
-                    if (!isset($returnSeats[$index])) {
-                        throw new \Exception('Return seat data mismatch');
-                    }
-                    $seat = $returnSeats[$index];
-                    $passenger = BusPassengers::create([
-                        'booking_id' => $booking->id,
+                    $seat = $returnSeats[$index] ?? null;
+                    if (!$seat) continue;
+
+                    BusPassengers::create([
+                        'booking_id'  => $booking->id,
                         'schedule_id' => $returnScheduleId,
-                        'seat' => $seat,
-                        'title' => $passengerData['title'],
-                        'given_name' => $passengerData['given_name'],
-                        'family_name' => $passengerData['family_name'],
-                        'phone' => $passengerData['phone'],
-                        'email' => $passengerData['email'],
-                        'dob' => $passengerData['dob'],
-                        'gender' => $passengerData['gender'],
-                        'seat_price' => $returnPrice,
+                        'seat'        => $seat,
+                        'title'       => $passengerData['title'] ?? '',
+                        'given_name'  => $passengerData['given_name'] ?? '',
+                        'family_name' => $passengerData['family_name'] ?? '',
+                        'phone'       => $passengerData['phone'] ?? '',
+                        'email'       => $passengerData['email'] ?? '',
+                        'dob'         => $passengerData['dob'] ?? null,
+                        'gender'      => $passengerData['gender'] ?? '',
+                        'seat_price'  => $returnPrice,
                     ]);
-
-                    // Handle identity documents for return journey
-                    if (isset($passengerData['identity_documents'])) {
-                        foreach ($passengerData['identity_documents'] as $docTypeId => $documentData) {
-                            if (!empty($documentData['type']) && !empty($documentData['unique_identifier'])) {
-                                BusDocuments::create([
-                                    'passenger_id' => $passenger->id,
-                                    'type' => $documentData['type'],
-                                    'unique_identifier' => $documentData['unique_identifier'],
-                                    'issuing_country_code' => $documentData['issuing_country_code'] ?? '',
-                                    'expires_on' => $documentData['expires_on'] ?? null,
-                                ]);
-                            }
-                        }
-                    } elseif (isset($passengerData['identity_document'])) {
-                        $documentData = $passengerData['identity_document'];
-                        BusDocuments::create([
-                            'passenger_id' => $passenger->id,
-                            'type' => $documentData['type'],
-                            'unique_identifier' => $documentData['unique_identifier'],
-                            'issuing_country_code' => $documentData['issuing_country_code'],
-                            'expires_on' => $documentData['expires_on'],
-                        ]);
-                    }
-
-                    $passengerDetails[] = [
-                        'name' => "{$passengerData['given_name']} {$passengerData['family_name']}",
-                        'seat' => $seat,
-                        'price' => $returnPrice,
-                    ];
                 }
             }
-            
-            // Create notification
-            Notification::create([
-                'user_id' => auth()->id() ?? null,
-                'type' => 'bus_booking',
-                'title' => 'Booking Confirmed (Test Payment)',
-                'message' => "Your booking ({$bookingreference}) from {$data['pickup']} to {$data['dropoff']} has been confirmed.",
-                'data' => ['schedule_id' => $scheduleId, 'booking_reference' => $bookingreference ?? null],
-            ]);
 
-            // Load schedule relationship for email
-            $booking->load(['schedule.bus.agency']);
-            
-            // Send booking confirmation email (wrap in try-catch so email failure doesn't break booking)
+            // Notification (wrap so it doesn't break booking)
             try {
-                $qrPng = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')->size(160)->generate($booking->bookingreference));
-                Mail::send('emails.booking-details', [
-                    'booking' => $booking,
-                    'passengerDetails' => $passengerDetails,
-                    'qrPng' => $qrPng,
-                ], function ($message) use ($contactEmail, $bookingreference) {
-                    $message->to($contactEmail)
-                        ->subject("Booking Confirmation - Reference: {$bookingreference}");
-                });
-
-                $passengers = BusPassengers::where('booking_id', $booking->id)
-                    ->get(['given_name', 'family_name', 'seat'])
-                    ->toArray();
-                $booking->notify(new \App\Notifications\BookingConfirmationEmail($booking, $passengers));
-            } catch (\Exception $mailEx) {
-                Log::warning('Test Payment - Email/QR failed (non-critical): ' . $mailEx->getMessage());
+                Notification::create([
+                    'user_id' => auth()->guard('customer')->id() ?? null,
+                    'type'    => 'bus_booking',
+                    'title'   => 'Booking Confirmed',
+                    'message' => "Booking {$bookingreference} confirmed.",
+                    'data'    => json_encode(['booking_reference' => $bookingreference]),
+                ]);
+            } catch (\Exception $notifEx) {
+                Log::warning('Notification create failed: ' . $notifEx->getMessage());
             }
 
-            Log::info('Test Payment - All operations completed successfully, committing transaction...');
+            // Email (wrap so it doesn't break booking)
+            try {
+                $booking->load(['schedule.bus.agency']);
+                $qrPng = base64_encode(\SimpleSoftwareIO\QrCode\Facades\QrCode::format('png')->size(160)->generate($bookingreference));
+                Mail::send('emails.booking-details', [
+                    'booking'          => $booking,
+                    'passengerDetails' => $passengerDetails,
+                    'qrPng'            => $qrPng,
+                ], function ($message) use ($contactEmail, $bookingreference) {
+                    $message->to($contactEmail)->subject("Booking Confirmation - {$bookingreference}");
+                });
+            } catch (\Exception $mailEx) {
+                Log::warning('Email failed (non-critical): ' . $mailEx->getMessage());
+            }
+
             DB::commit();
-            Log::info('Test Payment - Transaction committed successfully.');
             Session::forget(['tx_ref', 'booking_data']);
-            
-            // Redirect to dashboard with success message
+
+            Log::info('Test Payment - SUCCESS: booking ' . $booking->id . ' ref ' . $bookingreference);
+
             return redirect()->route('dashboard')
-                ->with('success', '🎉 Booking Confirmed! Reference: ' . $bookingreference);
-                
+                ->with('success', 'Booking Confirmed! Reference: ' . $bookingreference);
+
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Test Payment error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            Log::error('Test Payment FAILED: ' . $e->getMessage() . ' | File: ' . $e->getFile() . ':' . $e->getLine());
+            Log::error('Stack: ' . $e->getTraceAsString());
             return redirect()->route('home')
                 ->with('error', 'Booking failed: ' . $e->getMessage());
         }
