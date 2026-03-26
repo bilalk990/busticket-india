@@ -340,7 +340,13 @@ class BusBookingController extends Controller
         } catch (\Exception $e) {
             Log::error('Error in passengerDetails: ' . $e->getMessage());
             Log::error('Stack trace: ' . $e->getTraceAsString());
-            return redirect()->back()->with('error', 'An error occurred. Please try again.');
+            // Return JSON so we can see the exact error in browser
+            return response()->json([
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => collect(explode("\n", $e->getTraceAsString()))->take(10)->toArray()
+            ], 500);
         }
     }
 
