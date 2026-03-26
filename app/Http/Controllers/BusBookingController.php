@@ -230,8 +230,13 @@ class BusBookingController extends Controller
 
     public function passengerDetails(Request $request, $scheduleId)
     {
+        try {
+        Log::info('passengerDetails called with scheduleId: ' . $scheduleId);
+        Log::info('Request data: ' . json_encode($request->all()));
+        
         // Validate the input - skip bus_schedules existence check for virtual route IDs
         $isVirtual = str_starts_with($scheduleId, 'route_');
+        Log::info('Is virtual schedule: ' . ($isVirtual ? 'yes' : 'no'));
         
         $validatedData = $request->validate([
             'seats_outbound' => 'required|string',
@@ -248,6 +253,8 @@ class BusBookingController extends Controller
             'bags_per_passenger' => 'nullable|integer|min:0',
             'bag_weight' => 'nullable|numeric|min:0',
         ]);
+        
+        Log::info('Validation passed');
 
         // Retrieve selected seats
         $outboundSeats = explode(',', $request->input('seats_outbound', ''));
@@ -289,12 +296,15 @@ class BusBookingController extends Controller
                 ],
             ];
             $agencyDocumentTypes = collect();
+            Log::info('Virtual schedule created successfully');
         } else {
+            Log::info('Loading real schedule from database');
             $schedule = BusSchedules::with(['route', 'bus.agency.documentTypes'])->findOrFail($scheduleId);
             $agencyDocumentTypes = $schedule->bus->agency->documentTypes()
                 ->active()
                 ->ordered()
                 ->get();
+            Log::info('Real schedule loaded successfully');
         }
 
         $returnScheduleId = $request->input('return_schedule_id');
@@ -370,6 +380,9 @@ class BusBookingController extends Controller
             $totalPrice += $markupAmount;
         }
 
+        Log::info('About to return passenger_details view');
+        Log::info('Schedule object: ' . json_encode($schedule));
+        
         return view('bus.booking.passenger_details', [
             'schedule' => $schedule,
             'scheduleId' => $scheduleId,
@@ -398,6 +411,11 @@ class BusBookingController extends Controller
             'markupPerSeat' => $markupPerSeat,
             'totalSeats' => $totalSeats,
         ]);
+        } catch (\Exception $e) {
+            Log::error('Error in passengerDetails: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+            return redirect()->back()->with('error', 'An error occurred while loading passenger details. Please try again.');
+        }
     }
 
     public function applyCoupon(Request $request)

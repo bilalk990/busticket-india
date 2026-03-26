@@ -928,10 +928,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Original price from the page
     const originalPrice = parseFloat('{{ $totalPrice }}');
     const currency = '{{ $currency }}';
-    const scheduleId = parseInt('{{ $scheduleId }}');
-    const returnScheduleId = '{{ $returnScheduleId }}' ? parseInt('{{ $returnScheduleId }}') : null;
-    const agencyId = parseInt('{{ $schedule->bus->agency_id }}');
-    const routeId = parseInt('{{ $schedule->route_id }}');
+    const scheduleId = '{{ $scheduleId }}';
+    const returnScheduleId = '{{ $returnScheduleId }}' ? '{{ $returnScheduleId }}' : null;
+    const agencyId = parseInt('{{ is_object($schedule->bus) && isset($schedule->bus->agency_id) ? $schedule->bus->agency_id : 0 }}') || 0;
+    const routeId = parseInt('{{ isset($schedule->route_id) ? $schedule->route_id : 0 }}') || 0;
     const csrfToken = '{{ csrf_token() }}';
     
     let appliedCouponData = null;
