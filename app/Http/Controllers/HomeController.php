@@ -72,26 +72,23 @@ class HomeController extends Controller
                 ->get();
         }
 
-        // Cache top routes - v5
+        // Cache top routes - v6 - use bus_routes directly (bus_points may be empty)
         try {
-            $topRoutes = Cache::remember('top_routes_home_v5', 300, function () {
-                // Direct join query - bypasses ORM relationship issues
-                $rows = \Illuminate\Support\Facades\DB::table('bus_fares as bf')
-                    ->join('bus_points as bp1', 'bf.pickup', '=', 'bp1.id')
-                    ->join('bus_points as bp2', 'bf.dropoff', '=', 'bp2.id')
-                    ->select('bp1.name as pickup_name', 'bp2.name as dropoff_name',
-                             'bp1.latitude as pickup_latitude', 'bp1.longitude as pickup_longitude',
-                             'bp2.latitude as dropoff_latitude', 'bp2.longitude as dropoff_longitude')
+            $topRoutes = Cache::remember('top_routes_home_v6', 300, function () {
+                $rows = \Illuminate\Support\Facades\DB::table('bus_routes')
+                    ->whereNotNull('origin')
+                    ->whereNotNull('destination')
+                    ->select('origin as pickup_name', 'destination as dropoff_name')
                     ->limit(30)
                     ->get();
                 return $rows->map(function ($row) {
                     return (object)[
                         'pickup_name'       => $row->pickup_name,
                         'dropoff_name'      => $row->dropoff_name,
-                        'pickup_latitude'   => $row->pickup_latitude,
-                        'pickup_longitude'  => $row->pickup_longitude,
-                        'dropoff_latitude'  => $row->dropoff_latitude,
-                        'dropoff_longitude' => $row->dropoff_longitude,
+                        'pickup_latitude'   => null,
+                        'pickup_longitude'  => null,
+                        'dropoff_latitude'  => null,
+                        'dropoff_longitude' => null,
                     ];
                 });
             });
@@ -189,9 +186,29 @@ class HomeController extends Controller
                 ->findOrFail($id);
         }
 
+        // Use bus_routes directly since bus_points may be empty
+        // Build fake fares from routes so the schedule section shows
+        $routes = \App\Models\BusRoutes::where('agency_id', $id)->get();
+        
         $fares = BusFare::where('agency_id', $id)
             ->with(['route', 'pickupPoint', 'dropoffPoint'])
             ->get();
+
+        // If no fares but routes exist, create virtual fares from routes
+        if ($fares->isEmpty() && $routes->isNotEmpty()) {
+            $fares = $routes->map(function ($route) {
+                $fare = new BusFare();
+                $fare->id = $route->id;
+                $fare->agency_id = $route->agency_id;
+                $fare->route_id = $route->id;
+                $fare->amount = $route->adult_price ?? 0;
+                $fare->currency = 'USD';
+                $fare->departure_time = '08:00:00';
+                $fare->arrival_time = '16:00:00';
+                $fare->setRelation('route', $route);
+                return $fare;
+            });
+        }
 
         $title = ucfirst($agency->agency_name);
 
