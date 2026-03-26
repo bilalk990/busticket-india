@@ -9,9 +9,7 @@ cmds = [
     "php artisan config:clear",
     "php artisan cache:clear",
     "php artisan route:clear",
-    "php artisan view:clear",
-    "chmod -R 775 storage bootstrap/cache",
-    "php artisan storage:link || true"
+    "php artisan view:clear"
 ]
 
 [start]
