@@ -78,6 +78,16 @@ Route::get('/debug-db/{agency_id}', function ($agency_id) {
     ]);
 });
 
+Route::get('/debug-all', function () {
+    return response()->json([
+        'agencies' => \App\Models\BusAgency::select('id', 'agency_name', 'is_active')->get(),
+        'routes_summary' => \App\Models\BusRoutes::select('id', 'agency_id', 'origin', 'destination', 'route_name')->get(),
+        'fares_count' => \App\Models\BusFare::count(),
+        'points_count' => \App\Models\BusPoint::count(),
+        'latest_fares' => \App\Models\BusFare::with(['pickupPoint', 'dropoffPoint'])->latest()->take(20)->get(),
+    ]);
+});
+
 Route::get('/events', [EventController::class, 'index'])->name('event.list');
 Route::get('/taxi', [TaxiController::class, 'index'])->name('taxi');
 Route::get('/about', [App\Http\Controllers\AboutController::class, 'index'])->name('about.index');
