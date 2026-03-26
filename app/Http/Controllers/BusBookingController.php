@@ -278,14 +278,23 @@ class BusBookingController extends Controller
                         'route' => $route,
                         'bus' => (object)[
                             'id' => null,
+                            'name' => 'Standard Bus',
+                            'plate_number' => 'N/A',
                             'agency_id' => $route->agency_id,
                             'agency' => (object)[
                                 'id' => $route->agency_id,
                                 'agency_name' => $route->agency->agency_name ?? 'Bus Operator',
                                 'agency_logo' => $route->agency->agency_logo ?? null,
                             ],
+                            'layout' => (object)[
+                                'id' => null,
+                                'name' => 'Standard',
+                                'layout_type' => '2x2',
+                                'total_seats' => 40,
+                            ],
                         ],
                     ];
+
                 } else {
                     $schedule = \App\Models\BusSchedules::with(['route', 'bus.agency'])->findOrFail($scheduleId);
                 }
@@ -304,6 +313,31 @@ class BusBookingController extends Controller
                     'phone' => $user->phone,
                 ] : null;
 
+                // Get agency document types
+                $agencyDocumentTypes = \App\Models\AgencyDocumentType::where('agency_id', $route->agency_id ?? ($schedule->bus->agency_id ?? 0))
+                    ->where('status', 'active')
+                    ->get();
+
+                // Calculate Markup Fee
+                $markupFee = \App\Models\MarkupFee::where('status', 'active')->first();
+                $markupAmount = 0;
+                $markupLabel = null;
+                $markupType = null;
+                $markupPerSeat = 0;
+
+                if ($markupFee) {
+                    $markupLabel = $markupFee->name;
+                    $markupType = $markupFee->type;
+                    if ($markupFee->type === 'percentage') {
+                        $markupPerSeat = ($outboundPrice / count($outboundSeats)) * ($markupFee->amount / 100);
+                    } else {
+                        $markupPerSeat = $markupFee->amount;
+                    }
+                    $markupAmount = $markupPerSeat * count($outboundSeats);
+                }
+
+                $totalPrice += $markupAmount;
+
                 return view('bus.booking.passenger_details', [
                     'schedule' => $schedule,
                     'scheduleId' => $scheduleId,
@@ -317,7 +351,7 @@ class BusBookingController extends Controller
                     'currency' => $request->input('currency'),
                     'pickup' => $request->input('pickup'),
                     'dropoff' => $request->input('dropoff'),
-                    'agencyDocumentTypes' => collect(),
+                    'agencyDocumentTypes' => $agencyDocumentTypes,
                     'countries' => $countries,
                     'userData' => $userData,
                     'baggageFee' => $request->input('baggage_fee', 0),
@@ -325,11 +359,11 @@ class BusBookingController extends Controller
                     'overweightFee' => $request->input('overweight_fee', 0),
                     'bagsPerPassenger' => $request->input('bags_per_passenger', 1),
                     'bagWeight' => $request->input('bag_weight', 0),
-                    'markupAmount' => 0,
-                    'markupLabel' => null,
-                    'markupType' => null,
-                    'markupOriginalCurrency' => null,
-                    'markupPerSeat' => 0,
+                    'markupAmount' => $markupAmount,
+                    'markupLabel' => $markupLabel,
+                    'markupType' => $markupType,
+                    'markupOriginalCurrency' => $currency,
+                    'markupPerSeat' => $markupPerSeat,
                     'totalSeats' => count($outboundSeats),
                 ]);
             }

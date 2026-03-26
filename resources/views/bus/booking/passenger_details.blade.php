@@ -219,14 +219,13 @@
                 <div class="card-header border-bottom">
                     <h6 class="mb-0 card-title">Traveler Details(s)</h6>
                 </div>
-				<form action="{{ route('checkout.checkout', ['scheduleId' => $scheduleId, 'returnScheduleId' => $returnScheduleId, 'schedule' => $schedule, 'returnSchedule' => $returnSchedule]) }}" method="POST" id="bookingForm" data-minimum-age="{{ config('app.bus_travel.minimum_age', 5) }}">
+				<form action="{{ route('checkout.checkout', ['scheduleId' => $scheduleId, 'returnScheduleId' => $returnScheduleId]) }}" method="POST" id="bookingForm" data-minimum-age="{{ config('app.bus_travel.minimum_age', 5) }}">
 				  @csrf
                   <input type="hidden" name="outboundPrice" value="{{ $outboundPrice }}">
                   <input type="hidden" name="returnPrice" value="{{ $returnPrice }}">
                   <input type="hidden" name="totalPrice" value="{{ $totalPrice }}">
 
-                  <input type="hidden" name="schedule" value="{{ $schedule }}">
-                  <input type="hidden" name="return_schedule" value="{{ $returnSchedule}}">
+
 
 				  <input type="hidden" name="schedule_id" value="{{ $scheduleId }}">
 				  <input type="hidden" name="return_schedule_id" value="{{ $returnScheduleId }}">
