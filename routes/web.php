@@ -170,6 +170,17 @@ Route::get('/bus/booking/seat-selection/{pickup}/{dropoff}/{scheduleId}/{returnS
 
 Route::get('/bus/booking/passenger-details/{scheduleId}', [BusBookingController::class, 'passengerDetails'])->name('booking.passengerDetails');
 Route::post('/bus/booking/passenger-details/{scheduleId}', [BusBookingController::class, 'passengerDetails']);
+
+// Debug route to test passenger details
+Route::any('/debug-passenger-details/{scheduleId}', function($scheduleId) {
+    return response()->json([
+        'scheduleId' => $scheduleId,
+        'method' => request()->method(),
+        'data' => request()->all(),
+        'timestamp' => now()
+    ]);
+});
+
 Route::post('/bus/booking/apply-coupon', [BusBookingController::class, 'applyCoupon'])->name('booking.applyCoupon');
 
 Route::get('/retrieve-booking', [BusBookingController::class, 'showRetrieveForm'])->name('bookings.retrieve');
