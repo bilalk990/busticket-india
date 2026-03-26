@@ -42,10 +42,10 @@ Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/clear-all-cache', function () {
     try {
         \Illuminate\Support\Facades\Cache::flush();
-        \Illuminate\Support\Facades\Cache::forget('agencies_with_routes');
         \Illuminate\Support\Facades\Artisan::call('cache:clear');
         \Illuminate\Support\Facades\Artisan::call('config:clear');
-        return response()->json(['success' => true, 'message' => 'All caches cleared! Deleted companies removed from homepage.']);
+        \Illuminate\Support\Facades\Artisan::call('view:clear');
+        return response()->json(['success' => true, 'message' => 'All caches cleared!', 'time' => now()->toISOString()]);
     } catch (\Exception $e) {
         return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
     }
