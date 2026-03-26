@@ -181,6 +181,15 @@ Route::get('/test-server', function() {
     ]);
 });
 
+// Test POST endpoint
+Route::post('/test-post', function() {
+    return response()->json([
+        'status' => 'POST is working',
+        'timestamp' => now(),
+        'session_working' => session()->isStarted()
+    ]);
+})->middleware(['web']);
+
 Route::post('/bus/booking/apply-coupon', [BusBookingController::class, 'applyCoupon'])->name('booking.applyCoupon');
 
 Route::get('/retrieve-booking', [BusBookingController::class, 'showRetrieveForm'])->name('bookings.retrieve');

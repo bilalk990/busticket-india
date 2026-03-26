@@ -3,7 +3,9 @@
         "builder": "NIXPACKS"
     },
     "deploy": {
-        "startCommand": "php artisan serve --host=0.0.0.0 --port=${PORT:-8080}",
-        "restartPolicyType": "ON_FAILURE"
+        "startCommand": "bash start-server.sh",
+        "restartPolicyType": "ON_FAILURE",
+        "healthcheckPath": "/test-server",
+        "healthcheckTimeout": 100
     }
 }

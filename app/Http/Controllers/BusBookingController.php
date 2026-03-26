@@ -591,32 +591,34 @@ class BusBookingController extends Controller
      */
     public function handleTestPayment(Request $request)
     {
-        $tx_ref = $request->get('tx_ref');
-        Log::info("Test Payment initiated: tx_ref: $tx_ref");
+        try {
+            $tx_ref = $request->get('tx_ref');
+            Log::info("Test Payment initiated: tx_ref: $tx_ref");
 
-        $bookingreference = Session::get('tx_ref') ?? $tx_ref;
-        $data             = Session::get('booking_data');
+            $bookingreference = Session::get('tx_ref') ?? $tx_ref;
+            $data             = Session::get('booking_data');
 
-        // Try cache if session is lost (Railway ephemeral filesystem)
-        if (!$data && $tx_ref) {
-            $data = \Illuminate\Support\Facades\Cache::store('database')->get('booking_' . $tx_ref);
-            if ($data) {
-                Log::info('Test Payment - Recovered data from DB Cache');
+            // Try cache if session is lost (Railway ephemeral filesystem)
+            if (!$data && $tx_ref) {
+                $data = \Illuminate\Support\Facades\Cache::store('database')->get('booking_' . $tx_ref);
+                if ($data) {
+                    Log::info('Test Payment - Recovered data from DB Cache');
+                }
             }
-        }
 
-        Log::info('Test Payment data check', [
-            'tx_ref'    => $tx_ref,
-            'has_data'  => !empty($data),
-            'data_keys' => $data ? array_keys($data) : [],
-        ]);
+            Log::info('Test Payment data check', [
+                'tx_ref'    => $tx_ref,
+                'has_data'  => !empty($data),
+                'data_keys' => $data ? array_keys($data) : [],
+            ]);
 
-        if (!$data) {
-            Log::error('Test Payment - No booking data in session or cache for tx_ref: ' . $tx_ref);
-            return response()->json([
-                'error'  => 'Session expired - no booking data found',
-                'tx_ref' => $tx_ref,
-            ], 400);
+            if (!$data) {
+                Log::error('Test Payment - No booking data in session or cache for tx_ref: ' . $tx_ref);
+                return redirect()->back()->with('error', 'Session expired. Please try booking again.');
+            }
+        } catch (\Exception $e) {
+            Log::error('Test Payment - Initial error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'An error occurred. Please try again.');
         }
 
         $scheduleId       = $data['schedule_id'] ?? null;
@@ -808,13 +810,9 @@ class BusBookingController extends Controller
             DB::rollBack();
             Log::error('Test Payment FAILED: ' . $e->getMessage() . ' | File: ' . $e->getFile() . ':' . $e->getLine());
             Log::error('Stack: ' . $e->getTraceAsString());
-            // Return JSON so we can see exact error - remove after fix
-            return response()->json([
-                'error' => $e->getMessage(),
-                'file'  => basename($e->getFile()),
-                'line'  => $e->getLine(),
-                'scheduleId' => $scheduleId ?? 'unknown',
-            ], 500);
+            
+            // User-friendly error redirect instead of JSON
+            return redirect()->back()->with('error', 'Payment processing failed: ' . $e->getMessage());
         }
     }
 
