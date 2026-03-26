@@ -502,6 +502,9 @@ Route::get('/test-qr/{text}', function($text) {
 })->name('test.qr');
 
 Route::get('/fix-data', function () {
+    set_time_limit(300); // 5 minutes
+    \Illuminate\Support\Facades\Log::info('Starting data fix...');
+    
     $routes = \App\Models\BusRoutes::all();
     $createdFares = 0;
     $createdPoints = 0;
@@ -511,12 +514,10 @@ Route::get('/fix-data', function () {
         
         // Ensure points exist
         $originPoint = \App\Models\BusPoint::firstOrCreate(
-            ['name' => $route->origin, 'agency_id' => $agencyId],
-            ['status' => 'active']
+            ['name' => $route->origin, 'agency_id' => $agencyId]
         );
         $destinationPoint = \App\Models\BusPoint::firstOrCreate(
-            ['name' => $route->destination, 'agency_id' => $agencyId],
-            ['status' => 'active']
+            ['name' => $route->destination, 'agency_id' => $agencyId]
         );
         
         if ($originPoint->wasRecentlyCreated) $createdPoints++;
