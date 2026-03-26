@@ -173,16 +173,11 @@ class BusSearchController extends Controller
         if (!$destinationPoint) {
             $destinationPoint = BusPoint::where('name', 'LIKE', "%{$destinationName}%")->first();
         }
-        
-        // Debug logging
-        Log::info('Search Debug:', [
-            'origin_input' => $request->origin,
-            'destination_input' => $request->destination,
-            'origin_name_extracted' => $originName,
-            'destination_name_extracted' => $destinationName,
-            'origin_point_found' => $originPoint ? $originPoint->id : null,
-            'destination_point_found' => $destinationPoint ? $destinationPoint->id : null
-        ]);
+
+        // If bus_points not found, search directly via bus_routes
+        if (!$originPoint || !$destinationPoint) {
+            return $this->searchViaRoutes($request, $travelType);
+        }
 
         if (!$originPoint || !$destinationPoint) {
             return view('bus.search.results', [
@@ -607,5 +602,126 @@ class BusSearchController extends Controller
 
         // For any other type, return empty array
         return [];
+    }
+
+    /**
+     * Search directly via bus_routes when bus_points table is empty
+     * This is a fallback that matches origin/destination text against bus_routes
+     */
+    private function searchViaRoutes(Request $request, string $travelType)
+    {
+        $originInput = trim($request->origin);
+        $destinationInput = trim($request->destination);
+        $originFirst = trim(explode(',', $originInput)[0]);
+        $destinationFirst = trim(explode(',', $destinationInput)[0]);
+        $selectedCurrency = session('currency')['code'] ?? 'USD';
+        $exchangeRates = session('currency')['rates'] ?? [];
+
+        // Find matching routes by origin/destination text
+        $matchingRoutes = \App\Models\BusRoutes::where(function($q) use ($originInput, $originFirst) {
+                $q->where('origin', 'LIKE', "%{$originFirst}%")
+                  ->orWhere('origin', 'LIKE', "%{$originInput}%");
+            })
+            ->where(function($q) use ($destinationInput, $destinationFirst) {
+                $q->where('destination', 'LIKE', "%{$destinationFirst}%")
+                  ->orWhere('destination', 'LIKE', "%{$destinationInput}%");
+            })
+            ->with(['agency'])
+            ->get();
+
+        if ($matchingRoutes->isEmpty()) {
+            return view('bus.search.results', [
+                'schedules' => collect(),
+                'returnSchedules' => collect(),
+                'filters' => $this->getDefaultFilters(),
+                'originLat' => $request->origin_lat,
+                'originLng' => $request->origin_lng,
+                'destinationLat' => $request->destination_lat,
+                'destinationLng' => $request->destination_lng,
+                'travel_type' => $travelType,
+                'recommended_price' => null, 'recommended_duration' => null,
+                'cheapest_price' => null, 'fastest_duration' => null,
+                'min_price' => null, 'max_price' => null,
+                'bus_types' => collect(), 'departure_times' => collect(),
+                'amenities' => collect(), 'seat_types' => collect(), 'vendors' => collect(),
+            ]);
+        }
+
+        // Build virtual schedule entries from routes
+        $schedules = $matchingRoutes->map(function ($route) use ($selectedCurrency, $exchangeRates, $request) {
+            $fare = \App\Models\BusFare::where('route_id', $route->id)->first();
+            $amount = $fare ? $fare->amount : ($route->adult_price ?? 0);
+            $currency = $fare ? $fare->currency : 'USD';
+            $depTime = $fare ? $fare->departure_time : '08:00:00';
+            $arrTime = $fare ? $fare->arrival_time : '16:00:00';
+
+            $dep = \Carbon\Carbon::parse($depTime);
+            $arr = \Carbon\Carbon::parse($arrTime);
+
+            // Get bus for this agency
+            $bus = \Illuminate\Support\Facades\DB::table('buses')
+                ->where('agency_id', $route->agency_id)
+                ->where('status', 'active')
+                ->first();
+
+            $agencyName = $route->agency ? $route->agency->agency_name : 'Unknown';
+            $agencyLogo = $route->agency ? $route->agency->agency_logo : null;
+
+            return [
+                'id' => 'route_' . $route->id,
+                'departure_time' => $depTime,
+                'arrival_time' => $arrTime,
+                'duration' => $arr->diff($dep)->format('%H:%I'),
+                'fare' => (float) $amount,
+                'currency' => $currency,
+                'pickup' => $route->origin,
+                'dropoff' => $route->destination,
+                'bus_type' => $bus ? ($bus->bus_type ?? 'Standard') : 'Standard',
+                'amenities' => [],
+                'bus' => $bus ? [
+                    'id' => $bus->id,
+                    'name' => $bus->name,
+                    'plate_number' => $bus->plate_number,
+                    'agency' => ['id' => $route->agency_id, 'agency_name' => $agencyName, 'agency_logo' => $agencyLogo],
+                    'layout' => ['total_seats' => $bus->capacity ?? 40],
+                ] : [
+                    'id' => null,
+                    'name' => 'Bus',
+                    'agency' => ['id' => $route->agency_id, 'agency_name' => $agencyName, 'agency_logo' => $agencyLogo],
+                    'layout' => ['total_seats' => 40],
+                ],
+                'route' => $route,
+                'stops' => collect(),
+                'convertedFare' => $this->convertCurrency($amount, $currency, $selectedCurrency, $exchangeRates),
+                'selectedCurrency' => $selectedCurrency,
+                'seats_left' => $bus ? ($bus->capacity ?? 40) : 40,
+                'rating' => 0,
+                'status' => 'scheduled',
+            ];
+        });
+
+        $filters = $this->generateFilters($schedules->toArray());
+
+        return view('bus.search.results', [
+            'schedules' => $schedules,
+            'returnSchedules' => collect(),
+            'filters' => $filters,
+            'originLat' => $request->origin_lat,
+            'originLng' => $request->origin_lng,
+            'destinationLat' => $request->destination_lat,
+            'destinationLng' => $request->destination_lng,
+            'travel_type' => $travelType,
+            'recommended_price' => $schedules->min('fare'),
+            'recommended_duration' => null,
+            'cheapest_price' => $schedules->min('fare'),
+            'fastest_duration' => null,
+            'min_price' => $schedules->min('fare'),
+            'max_price' => $schedules->max('fare'),
+            'bus_types' => $schedules->pluck('bus_type')->unique(),
+            'departure_times' => collect(),
+            'amenities' => collect(),
+            'seat_types' => collect(),
+            'vendors' => collect(),
+        ]);
     }
 }
