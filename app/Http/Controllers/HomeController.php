@@ -77,12 +77,15 @@ class HomeController extends Controller
             $topRoutes = Cache::remember('top_routes_home_v3', 1800, function () {
                 return BusFare::with(['pickupPoint', 'dropoffPoint'])
                     ->select('id', 'pickup', 'dropoff', 'amount', 'currency', 'departure_time', 'arrival_time')
-                    ->limit(30)
                     ->get()
+                    ->filter(function ($fare) {
+                        return $fare->pickupPoint && $fare->dropoffPoint;
+                    })
+                    ->take(30)
                     ->map(function ($fare) {
                         return (object)[
-                            'pickup_name' => $fare->pickupPoint->name ?? 'Unknown',
-                            'dropoff_name' => $fare->dropoffPoint->name ?? 'Unknown',
+                            'pickup_name' => $fare->pickupPoint->name,
+                            'dropoff_name' => $fare->dropoffPoint->name,
                             'pickup_latitude' => $fare->pickupPoint->latitude ?? null,
                             'pickup_longitude' => $fare->pickupPoint->longitude ?? null,
                             'dropoff_latitude' => $fare->dropoffPoint->latitude ?? null,
@@ -94,12 +97,15 @@ class HomeController extends Controller
             \Log::warning('Cache failed for top routes: ' . $e->getMessage());
             $topRoutes = BusFare::with(['pickupPoint', 'dropoffPoint'])
                 ->select('id', 'pickup', 'dropoff', 'amount', 'currency', 'departure_time', 'arrival_time')
-                ->limit(30)
                 ->get()
+                ->filter(function ($fare) {
+                    return $fare->pickupPoint && $fare->dropoffPoint;
+                })
+                ->take(30)
                 ->map(function ($fare) {
                     return (object)[
-                        'pickup_name' => $fare->pickupPoint->name ?? 'Unknown',
-                        'dropoff_name' => $fare->dropoffPoint->name ?? 'Unknown',
+                        'pickup_name' => $fare->pickupPoint->name,
+                        'dropoff_name' => $fare->dropoffPoint->name,
                         'pickup_latitude' => $fare->pickupPoint->latitude ?? null,
                         'pickup_longitude' => $fare->pickupPoint->longitude ?? null,
                         'dropoff_latitude' => $fare->dropoffPoint->latitude ?? null,

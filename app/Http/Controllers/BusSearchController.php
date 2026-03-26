@@ -128,6 +128,14 @@ class BusSearchController extends Controller
         // Additional validation
         $errors = [];
         
+        // Check if origin and destination are 'Unknown'
+        if (strtolower(trim($request->origin)) === 'unknown') {
+            $errors['origin'] = 'Invalid origin point selected.';
+        }
+        if (strtolower(trim($request->destination)) === 'unknown') {
+            $errors['destination'] = 'Invalid destination point selected.';
+        }
+
         // Check if origin and destination are the same
         if (strtolower(trim($request->origin)) === strtolower(trim($request->destination))) {
             $errors['destination'] = 'Origin and destination cannot be the same.';
