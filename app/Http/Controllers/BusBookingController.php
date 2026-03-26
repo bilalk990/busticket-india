@@ -49,6 +49,12 @@ class BusBookingController extends Controller
         $pickup = urldecode($pickup);
         $dropoff = urldecode($dropoff);
 
+        // Handle virtual schedule IDs (route_X) - from searchViaRoutes fallback
+        if (str_starts_with($scheduleId, 'route_')) {
+            $routeId = str_replace('route_', '', $scheduleId);
+            return $this->seatSelectionFromRoute($pickup, $dropoff, $routeId);
+        }
+
         // Find the corresponding point IDs for pickup and dropoff
         $pickupPoint = BusPoint::where('name', 'LIKE', "%$pickup%")->first();
         $dropoffPoint = BusPoint::where('name', 'LIKE', "%$dropoff%")->first();
@@ -2108,5 +2114,84 @@ class BusBookingController extends Controller
 
         // Return PDF download
         return $pdf->download('ticket-' . $ticket->ticket_number . '.pdf');
+    }
+
+    /**
+     * Handle seat selection for virtual routes (when bus_schedules is empty)
+     */
+    private function seatSelectionFromRoute($pickup, $dropoff, $routeId)
+    {
+        $route = \App\Models\BusRoutes::with('agency')->find($routeId);
+
+        if (!$route) {
+            return back()->with('error', 'Route not found.');
+        }
+
+        // Get a bus for this agency
+        $bus = \Illuminate\Support\Facades\DB::table('buses')
+            ->where('agency_id', $route->agency_id)
+            ->where('status', 'active')
+            ->first();
+
+        $fare = \App\Models\BusFare::where('route_id', $routeId)->first();
+        $amount = $fare ? $fare->amount : ($route->adult_price ?? 0);
+        $currency = $fare ? $fare->currency : 'USD';
+        $capacity = $bus ? ($bus->capacity ?? 40) : 40;
+
+        // Build simple seat rows (4 columns)
+        $rows = [];
+        $seatNum = 1;
+        for ($r = 0; $r < ceil($capacity / 4); $r++) {
+            $rowSeats = [];
+            $rowLetter = chr(65 + $r);
+            for ($c = 1; $c <= 4 && $seatNum <= $capacity; $c++) {
+                $rowSeats[] = $rowLetter . $c;
+                $seatNum++;
+            }
+            $rows[] = ['row' => $r + 1, 'seats' => $rowSeats];
+        }
+
+        $seatLayout = ['rows' => $rows];
+        $bookedSeats = [];
+
+        $scheduleData = (object)[
+            'id' => 'route_' . $routeId,
+            'route_id' => $routeId,
+            'departure_time' => $fare ? $fare->departure_time : '08:00:00',
+            'arrival_time' => $fare ? $fare->arrival_time : '16:00:00',
+            'departure_date' => now()->addDay()->format('Y-m-d'),
+            'status' => 'scheduled',
+            'bus' => $bus ? (object)[
+                'id' => $bus->id,
+                'name' => $bus->name,
+                'agency_id' => $route->agency_id,
+                'agency' => $route->agency,
+                'layout' => (object)['total_seats' => $capacity],
+            ] : (object)[
+                'id' => null,
+                'name' => 'Bus',
+                'agency_id' => $route->agency_id,
+                'agency' => $route->agency,
+                'layout' => (object)['total_seats' => $capacity],
+            ],
+            'route' => $route,
+        ];
+
+        return view('bus.booking.seat-selection', [
+            'schedule' => $scheduleData,
+            'returnSchedule' => null,
+            'pickup' => $pickup,
+            'dropoff' => $dropoff,
+            'outboundPrice' => $amount,
+            'outboundCurrency' => $currency,
+            'returnPrice' => null,
+            'returnCurrency' => null,
+            'seatLayout' => $seatLayout,
+            'returnSeatLayout' => null,
+            'bookedSeats' => $bookedSeats,
+            'returnBookedSeats' => [],
+            'baggagePolicy' => null,
+            'discountCodes' => collect(),
+        ]);
     }
 }
