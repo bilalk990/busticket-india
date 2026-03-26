@@ -52,15 +52,29 @@ Route::get('/clear-all-cache', function () {
 });
 
 Route::get('/debug-db/{agency_id}', function ($agency_id) {
+    if (!app()->environment('local') && env('DEBUG_PASS') !== request('pass')) {
+        // Simple protection
+        // return response()->json(['error' => 'Unauthorized'], 403);
+    }
+
     $agency = \App\Models\BusAgency::find($agency_id);
     if (!$agency) return response()->json(['error' => 'Agency not found']);
     
+    // Get column names
+    $fareColumns = \Illuminate\Support\Facades\Schema::getColumnListing('bus_fares');
+    $pointColumns = \Illuminate\Support\Facades\Schema::getColumnListing('bus_points');
+    $routeColumns = \Illuminate\Support\Facades\Schema::getColumnListing('bus_routes');
+
     return response()->json([
         'agency' => $agency,
+        'schema' => [
+            'bus_fares' => $fareColumns,
+            'bus_points' => $pointColumns,
+            'bus_routes' => $routeColumns,
+        ],
         'routes' => \App\Models\BusRoutes::where('agency_id', $agency_id)->get(),
         'fares' => \App\Models\BusFare::where('agency_id', $agency_id)->with(['pickupPoint', 'dropoffPoint'])->get(),
         'points' => \App\Models\BusPoint::where('agency_id', $agency_id)->get(),
-        'schedules' => \App\Models\BusSchedules::where('agency_id', $agency_id)->get(),
     ]);
 });
 
