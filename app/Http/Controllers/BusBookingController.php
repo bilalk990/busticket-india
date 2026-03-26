@@ -603,21 +603,26 @@ class BusBookingController extends Controller
 
         // Session mismatch or missing - try to recover from POST data
         if (!$data && $request->has('booking_data')) {
-            $data = json_decode(base64_decode($request->input('booking_data')), true);
-            $bookingreference = $tx_ref; // trust the POST tx_ref
-            Log::info('Test Payment - Recovered data from POST (session was lost)');
+            $decoded = json_decode(base64_decode($request->input('booking_data')), true);
+            if ($decoded) {
+                $data = $decoded;
+                $bookingreference = $tx_ref;
+                Log::info('Test Payment - Recovered data from POST, keys: ' . implode(', ', array_keys($data)));
+            } else {
+                Log::error('Test Payment - Failed to decode POST booking_data');
+            }
         }
 
         // Session mismatch or missing
         if (!$data || !$bookingreference) {
-            Log::error('Test Payment - Session missing or expired');
-            return redirect()->route('home')->with('error', 'Session expired. Please start your booking again.');
-        }
-
-        // Only check tx_ref if we got data from session (not POST recovery)
-        if (Session::get('tx_ref') && $tx_ref !== $bookingreference) {
-            Log::error("Test Payment - tx_ref mismatch: request=$tx_ref session=$bookingreference");
-            return redirect()->route('home')->with('error', 'Invalid payment token. Please try again.');
+            Log::error('Test Payment - No data available. Session: ' . ($bookingreference ?? 'null') . ', POST booking_data: ' . ($request->has('booking_data') ? 'present' : 'missing'));
+            return response()->json([
+                'error' => 'Session expired',
+                'session_tx_ref' => $bookingreference,
+                'request_tx_ref' => $tx_ref,
+                'has_booking_data_post' => $request->has('booking_data'),
+                'all_post_keys' => array_keys($request->all()),
+            ], 400);
         }
 
         $scheduleId       = $data['schedule_id'] ?? null;
@@ -808,8 +813,13 @@ class BusBookingController extends Controller
             DB::rollBack();
             Log::error('Test Payment FAILED: ' . $e->getMessage() . ' | File: ' . $e->getFile() . ':' . $e->getLine());
             Log::error('Stack: ' . $e->getTraceAsString());
-            return redirect()->route('home')
-                ->with('error', 'Booking failed: ' . $e->getMessage());
+            // Return JSON so we can see exact error - remove after fix
+            return response()->json([
+                'error' => $e->getMessage(),
+                'file'  => basename($e->getFile()),
+                'line'  => $e->getLine(),
+                'scheduleId' => $scheduleId ?? 'unknown',
+            ], 500);
         }
     }
 
