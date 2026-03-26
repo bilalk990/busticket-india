@@ -72,9 +72,9 @@ class HomeController extends Controller
                 ->get();
         }
 
-        // Cache top routes for 30 minutes
+        // Cache top routes for 30 minutes (v3 - fixed relationships)
         try {
-            $topRoutes = Cache::remember('top_routes_home_v2', 1800, function () {
+            $topRoutes = Cache::remember('top_routes_home_v3', 1800, function () {
                 return BusFare::with(['pickupPoint', 'dropoffPoint'])
                     ->select('id', 'pickup', 'dropoff', 'amount', 'currency', 'departure_time', 'arrival_time')
                     ->limit(30)
