@@ -171,6 +171,16 @@ Route::get('/bus/booking/seat-selection/{pickup}/{dropoff}/{scheduleId}/{returnS
 Route::get('/bus/booking/passenger-details/{scheduleId}', [BusBookingController::class, 'passengerDetails'])->name('booking.passengerDetails');
 Route::post('/bus/booking/passenger-details/{scheduleId}', [BusBookingController::class, 'passengerDetails']);
 
+// Simple test route
+Route::get('/test-server', function() {
+    return response()->json([
+        'status' => 'Server is working',
+        'timestamp' => now(),
+        'php_version' => PHP_VERSION,
+        'laravel_version' => app()->version()
+    ]);
+});
+
 Route::post('/bus/booking/apply-coupon', [BusBookingController::class, 'applyCoupon'])->name('booking.applyCoupon');
 
 Route::get('/retrieve-booking', [BusBookingController::class, 'showRetrieveForm'])->name('bookings.retrieve');
