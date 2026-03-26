@@ -16,7 +16,7 @@ class HomeController extends Controller
     {
         // Cache agencies with routes count for 5 minutes (reduced from 1 hour) - only show active agencies
         try {
-            $agencies = Cache::remember('agencies_with_routes', 300, function () {
+            $agencies = Cache::remember('agencies_with_routes', 60, function () {
                 return BusAgency::where('is_active', true)
                     ->orWhereNull('is_active') // Include agencies where is_active is null (for backward compatibility)
                     ->withCount('routes')
@@ -74,7 +74,7 @@ class HomeController extends Controller
 
         // Cache top routes for 30 minutes (v3 - fixed relationships)
         try {
-            $topRoutes = Cache::remember('top_routes_home_v3', 1800, function () {
+            $topRoutes = Cache::remember('top_routes_home_v3', 60, function () {
                 return BusFare::with(['pickupPoint', 'dropoffPoint'])
                     ->select('id', 'pickup', 'dropoff', 'amount', 'currency', 'departure_time', 'arrival_time')
                     ->get()
@@ -193,7 +193,7 @@ class HomeController extends Controller
     public function show($id)
     {
         try {
-            $agency = Cache::remember('agency_' . $id, 1800, function () use ($id) {
+            $agency = Cache::remember('agency_' . $id, 60, function () use ($id) {
                 return BusAgency::with(['routes', 'schedules.route'])
                     ->findOrFail($id);
             });
