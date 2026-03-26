@@ -282,6 +282,13 @@ Route::get('/booking-details/{id}', [BusBookingController::class, 'getBookingDet
 Route::get('/your-booking', [BusBookingController::class, 'trackBooking'])
     ->middleware(['auth:customer', 'verified']);
 
+Route::get('/checkout', function() {
+    // If someone tries to access checkout directly with GET, redirect back to search
+    return redirect()->route('home')->with('info', 'Please start a new booking from the search page.');
+})
+    ->middleware(['auth:customer', 'verified'])
+    ->name('checkout.get');
+
 Route::post('/checkout', [BusBookingController::class, 'checkout'])
     ->middleware(['auth:customer', 'verified'])
     ->name('checkout.checkout');
