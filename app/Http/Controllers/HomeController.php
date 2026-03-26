@@ -72,9 +72,9 @@ class HomeController extends Controller
                 ->get();
         }
 
-        // Cache top routes - v6 - use bus_routes directly (bus_points may be empty)
+        // Cache top routes - v7
         try {
-            $topRoutes = Cache::remember('top_routes_home_v6', 300, function () {
+            $topRoutes = Cache::remember('top_routes_home_v7', 300, function () {
                 $rows = \Illuminate\Support\Facades\DB::table('bus_routes')
                     ->whereNotNull('origin')
                     ->whereNotNull('destination')
