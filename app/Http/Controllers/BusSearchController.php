@@ -117,8 +117,8 @@ class BusSearchController extends Controller
         $request->validate([
             'origin' => 'required|string|max:255',
             'destination' => 'required|string|max:255',
-            'travel_date' => 'required|date|after_or_equal:today',
-            'return_date' => 'nullable|date|after:travel_date',
+            'travel_date' => 'required|date',
+            'return_date' => 'nullable|date',
             'travel_type' => 'nullable|in:oneway,roundtrip',
         ]);
 
