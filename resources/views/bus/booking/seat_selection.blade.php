@@ -178,6 +178,9 @@
                                 'seatLayout' => $seatLayout,
                                 'bookedSeats' => $bookedSeats,
                                 'tripType' => 'outbound',
+                                'outboundPrice' => $outboundPrice ?? 0,
+                                'outboundCurrency' => $outboundCurrency ?? 'USD',
+                                'returnPrice' => $returnPrice ?? 0,
                             ])
                         </div>
 
@@ -234,6 +237,9 @@
                                 'seatLayout' => $returnSeatLayout,
                                 'bookedSeats' => $returnBookedSeats,
                                 'tripType' => 'return',
+                                'outboundPrice' => $outboundPrice ?? 0,
+                                'outboundCurrency' => $outboundCurrency ?? 'USD',
+                                'returnPrice' => $returnPrice ?? 0,
                             ])
                         </div>
                     </div>

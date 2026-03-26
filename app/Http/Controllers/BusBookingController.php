@@ -2121,77 +2121,83 @@ class BusBookingController extends Controller
      */
     private function seatSelectionFromRoute($pickup, $dropoff, $routeId)
     {
-        $route = \App\Models\BusRoutes::with('agency')->find($routeId);
+        try {
+            $route = \App\Models\BusRoutes::with('agency')->find($routeId);
 
-        if (!$route) {
-            return back()->with('error', 'Route not found.');
-        }
-
-        // Get a bus for this agency
-        $bus = \Illuminate\Support\Facades\DB::table('buses')
-            ->where('agency_id', $route->agency_id)
-            ->where('status', 'active')
-            ->first();
-
-        $fare = \App\Models\BusFare::where('route_id', $routeId)->first();
-        $amount = $fare ? $fare->amount : ($route->adult_price ?? 0);
-        $currency = $fare ? $fare->currency : 'USD';
-        $capacity = $bus ? ($bus->capacity ?? 40) : 40;
-
-        // Build simple seat rows (4 columns)
-        $rows = [];
-        $seatNum = 1;
-        for ($r = 0; $r < ceil($capacity / 4); $r++) {
-            $rowSeats = [];
-            $rowLetter = chr(65 + $r);
-            for ($c = 1; $c <= 4 && $seatNum <= $capacity; $c++) {
-                $rowSeats[] = $rowLetter . $c;
-                $seatNum++;
+            if (!$route) {
+                return back()->with('error', 'Route not found.');
             }
-            $rows[] = ['row' => $r + 1, 'seats' => $rowSeats];
+
+            $bus = \Illuminate\Support\Facades\DB::table('buses')
+                ->where('agency_id', $route->agency_id)
+                ->first();
+
+            $fare = \App\Models\BusFare::where('route_id', $routeId)->first();
+            $amount = (float)($fare ? $fare->amount : ($route->adult_price ?? 10));
+            $currency = $fare ? ($fare->currency ?? 'USD') : 'USD';
+            $depTime = $fare ? ($fare->departure_time ?? '08:00:00') : '08:00:00';
+            $arrTime = $fare ? ($fare->arrival_time ?? '16:00:00') : '16:00:00';
+            $capacity = $bus ? ($bus->capacity ?? 40) : 40;
+
+            // Build seat rows (4 columns)
+            $rows = [];
+            $seatNum = 1;
+            for ($r = 0; $r < ceil($capacity / 4); $r++) {
+                $rowSeats = [];
+                $rowLetter = chr(65 + $r);
+                for ($c = 1; $c <= 4 && $seatNum <= $capacity; $c++) {
+                    $rowSeats[] = $rowLetter . $c;
+                    $seatNum++;
+                }
+                $rows[] = ['row' => $r + 1, 'seats' => $rowSeats];
+            }
+
+            // Build a proper agency object
+            $agency = $route->agency;
+            $agencyData = (object)[
+                'id' => $route->agency_id,
+                'agency_name' => optional($agency)->agency_name ?? 'Bus Operator',
+                'agency_logo' => optional($agency)->agency_logo ?? null,
+            ];
+
+            $busData = (object)[
+                'id' => $bus ? $bus->id : null,
+                'name' => $bus ? ($bus->name ?? 'Bus') : 'Bus',
+                'agency_id' => $route->agency_id,
+                'agency' => $agencyData,
+                'layout' => (object)['total_seats' => $capacity],
+            ];
+
+            $scheduleData = (object)[
+                'id' => 'route_' . $routeId,
+                'route_id' => $routeId,
+                'departure_time' => $depTime,
+                'arrival_time' => $arrTime,
+                'departure_date' => now()->addDay()->format('Y-m-d'),
+                'status' => 'scheduled',
+                'bus' => $busData,
+                'route' => $route,
+            ];
+
+            return view('bus.booking.seat_selection', [
+                'schedule' => $scheduleData,
+                'returnSchedule' => null,
+                'pickup' => $pickup,
+                'dropoff' => $dropoff,
+                'outboundPrice' => $amount,
+                'outboundCurrency' => $currency,
+                'returnPrice' => null,
+                'returnCurrency' => null,
+                'seatLayout' => ['rows' => $rows],
+                'returnSeatLayout' => null,
+                'bookedSeats' => [],
+                'returnBookedSeats' => [],
+                'baggagePolicy' => null,
+                'discountCodes' => collect(),
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('seatSelectionFromRoute error: ' . $e->getMessage() . ' | ' . $e->getTraceAsString());
+            return back()->with('error', 'Unable to load seat selection. Please try again.');
         }
-
-        $seatLayout = ['rows' => $rows];
-        $bookedSeats = [];
-
-        $scheduleData = (object)[
-            'id' => 'route_' . $routeId,
-            'route_id' => $routeId,
-            'departure_time' => $fare ? $fare->departure_time : '08:00:00',
-            'arrival_time' => $fare ? $fare->arrival_time : '16:00:00',
-            'departure_date' => now()->addDay()->format('Y-m-d'),
-            'status' => 'scheduled',
-            'bus' => $bus ? (object)[
-                'id' => $bus->id,
-                'name' => $bus->name,
-                'agency_id' => $route->agency_id,
-                'agency' => $route->agency,
-                'layout' => (object)['total_seats' => $capacity],
-            ] : (object)[
-                'id' => null,
-                'name' => 'Bus',
-                'agency_id' => $route->agency_id,
-                'agency' => $route->agency,
-                'layout' => (object)['total_seats' => $capacity],
-            ],
-            'route' => $route,
-        ];
-
-        return view('bus.booking.seat-selection', [
-            'schedule' => $scheduleData,
-            'returnSchedule' => null,
-            'pickup' => $pickup,
-            'dropoff' => $dropoff,
-            'outboundPrice' => $amount,
-            'outboundCurrency' => $currency,
-            'returnPrice' => null,
-            'returnCurrency' => null,
-            'seatLayout' => $seatLayout,
-            'returnSeatLayout' => null,
-            'bookedSeats' => $bookedSeats,
-            'returnBookedSeats' => [],
-            'baggagePolicy' => null,
-            'discountCodes' => collect(),
-        ]);
     }
 }
