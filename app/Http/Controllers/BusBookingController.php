@@ -617,24 +617,26 @@ class BusBookingController extends Controller
             Log::info('Test Payment - Selected Outbound Seats: ' . implode(', ', $selectedSeats));
             Log::info('Test Payment - Selected Return Seats: ' . implode(', ', $returnSeats));
 
-            // Check if seats are already booked
-            $bookedSeats = BusPassengers::where('schedule_id', $scheduleId)
-                ->whereIn('seat', $selectedSeats)
-                ->pluck('seat')
-                ->toArray();
-            if (!empty($bookedSeats)) {
-                return redirect()->route('home')
-                    ->with('error', 'The following outbound seats are already booked: ' . implode(', ', $bookedSeats));
-            }
-
-            if ($returnScheduleId) {
-                $bookedReturnSeats = BusPassengers::where('schedule_id', $returnScheduleId)
-                    ->whereIn('seat', $returnSeats)
+            // Check if seats are already booked (skip for virtual routes - real schedule not created yet)
+            if (!str_starts_with($scheduleId, 'route_')) {
+                $bookedSeats = BusPassengers::where('schedule_id', $scheduleId)
+                    ->whereIn('seat', $selectedSeats)
                     ->pluck('seat')
                     ->toArray();
-                if (!empty($bookedReturnSeats)) {
+                if (!empty($bookedSeats)) {
                     return redirect()->route('home')
-                        ->with('error', 'The following return seats are already booked: ' . implode(', ', $bookedReturnSeats));
+                        ->with('error', 'The following outbound seats are already booked: ' . implode(', ', $bookedSeats));
+                }
+
+                if ($returnScheduleId) {
+                    $bookedReturnSeats = BusPassengers::where('schedule_id', $returnScheduleId)
+                        ->whereIn('seat', $returnSeats)
+                        ->pluck('seat')
+                        ->toArray();
+                    if (!empty($bookedReturnSeats)) {
+                        return redirect()->route('home')
+                            ->with('error', 'The following return seats are already booked: ' . implode(', ', $bookedReturnSeats));
+                    }
                 }
             }
 
@@ -849,12 +851,10 @@ class BusBookingController extends Controller
             DB::rollBack();
             Log::error('Test Payment error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
-                'data' => $data ?? [],
-                'scheduleId' => $scheduleId,
-                'returnScheduleId' => $returnScheduleId
+                'scheduleId' => $scheduleId ?? null,
             ]);
-            return redirect()->route('home')
-                ->with('error', 'There was an issue processing your test booking: ' . $e->getMessage());
+            return redirect()->back()
+                ->with('error', 'Booking failed: ' . $e->getMessage());
         }
     }
 
