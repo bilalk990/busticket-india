@@ -591,6 +591,11 @@ class BusBookingController extends Controller
      */
     public function handleTestPayment(Request $request)
     {
+        Log::info("=== TEST PAYMENT STARTED ===");
+        Log::info("Request method: " . $request->method());
+        Log::info("Request URL: " . $request->fullUrl());
+        Log::info("Request data: ", $request->all());
+        
         try {
             $tx_ref = $request->get('tx_ref');
             Log::info("Test Payment initiated: tx_ref: $tx_ref");
@@ -598,11 +603,20 @@ class BusBookingController extends Controller
             $bookingreference = Session::get('tx_ref') ?? $tx_ref;
             $data             = Session::get('booking_data');
 
+            Log::info("Session data check:", [
+                'session_tx_ref' => Session::get('tx_ref'),
+                'has_booking_data' => !empty($data),
+                'session_id' => session()->getId()
+            ]);
+
             // Try cache if session is lost (Railway ephemeral filesystem)
             if (!$data && $tx_ref) {
+                Log::info("Trying to recover from cache for tx_ref: $tx_ref");
                 $data = \Illuminate\Support\Facades\Cache::store('database')->get('booking_' . $tx_ref);
                 if ($data) {
                     Log::info('Test Payment - Recovered data from DB Cache');
+                } else {
+                    Log::error('Test Payment - No data in cache either');
                 }
             }
 
@@ -614,11 +628,12 @@ class BusBookingController extends Controller
 
             if (!$data) {
                 Log::error('Test Payment - No booking data in session or cache for tx_ref: ' . $tx_ref);
-                return redirect()->back()->with('error', 'Session expired. Please try booking again.');
+                return redirect()->route('home')->with('error', 'Session expired. Please start a new booking.');
             }
         } catch (\Exception $e) {
             Log::error('Test Payment - Initial error: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'An error occurred. Please try again.');
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+            return redirect()->route('home')->with('error', 'An error occurred: ' . $e->getMessage());
         }
 
         $scheduleId       = $data['schedule_id'] ?? null;
@@ -801,18 +816,25 @@ class BusBookingController extends Controller
             Session::forget(['tx_ref', 'booking_data']);
             \Illuminate\Support\Facades\Cache::store('database')->forget('booking_' . $bookingreference);
 
-            Log::info('Test Payment - SUCCESS: booking ' . $booking->id . ' ref ' . $bookingreference);
+            Log::info('=== TEST PAYMENT SUCCESS ===');
+            Log::info('Booking ID: ' . $booking->id);
+            Log::info('Booking Reference: ' . $bookingreference);
+            Log::info('Redirecting to dashboard...');
 
             return redirect()->route('dashboard')
-                ->with('success', 'Booking Confirmed! Reference: ' . $bookingreference);
+                ->with('success', '🎉 Booking Confirmed Successfully! Your booking reference is: ' . $bookingreference)
+                ->with('booking_reference', $bookingreference)
+                ->with('booking_id', $booking->id);
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Test Payment FAILED: ' . $e->getMessage() . ' | File: ' . $e->getFile() . ':' . $e->getLine());
+            Log::error('=== TEST PAYMENT FAILED ===');
+            Log::error('Error: ' . $e->getMessage());
+            Log::error('File: ' . $e->getFile() . ':' . $e->getLine());
             Log::error('Stack: ' . $e->getTraceAsString());
             
-            // User-friendly error redirect instead of JSON
-            return redirect()->back()->with('error', 'Payment processing failed: ' . $e->getMessage());
+            // User-friendly error redirect
+            return redirect()->route('home')->with('error', 'Payment processing failed: ' . $e->getMessage());
         }
     }
 
