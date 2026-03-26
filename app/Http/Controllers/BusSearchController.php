@@ -475,7 +475,12 @@ class BusSearchController extends Controller
             ];
         })();
 
-        return view('bus.search.results', $searchResults);
+        try {
+            return view('bus.search.results', $searchResults);
+        } catch (\Exception $e) {
+            \Log::error('Search results view error: ' . $e->getMessage());
+            return view('bus.search.results', array_merge($searchResults, ['schedules' => collect()]));
+        }
     }
 
     private function getDefaultFilters()
@@ -606,7 +611,6 @@ class BusSearchController extends Controller
 
     /**
      * Search directly via bus_routes when bus_points table is empty
-     * This is a fallback that matches origin/destination text against bus_routes
      */
     private function searchViaRoutes(Request $request, string $travelType)
     {
@@ -617,111 +621,127 @@ class BusSearchController extends Controller
         $selectedCurrency = session('currency')['code'] ?? 'USD';
         $exchangeRates = session('currency')['rates'] ?? [];
 
-        // Find matching routes by origin/destination text
-        $matchingRoutes = \App\Models\BusRoutes::where(function($q) use ($originInput, $originFirst) {
-                $q->where('origin', 'LIKE', "%{$originFirst}%")
-                  ->orWhere('origin', 'LIKE', "%{$originInput}%");
-            })
-            ->where(function($q) use ($destinationInput, $destinationFirst) {
-                $q->where('destination', 'LIKE', "%{$destinationFirst}%")
-                  ->orWhere('destination', 'LIKE', "%{$destinationInput}%");
-            })
-            ->with(['agency'])
-            ->get();
-
-        if ($matchingRoutes->isEmpty()) {
-            return view('bus.search.results', [
-                'schedules' => collect(),
-                'returnSchedules' => collect(),
-                'filters' => $this->getDefaultFilters(),
-                'originLat' => $request->origin_lat,
-                'originLng' => $request->origin_lng,
-                'destinationLat' => $request->destination_lat,
-                'destinationLng' => $request->destination_lng,
-                'travel_type' => $travelType,
-                'recommended_price' => null, 'recommended_duration' => null,
-                'cheapest_price' => null, 'fastest_duration' => null,
-                'min_price' => null, 'max_price' => null,
-                'bus_types' => collect(), 'departure_times' => collect(),
-                'amenities' => collect(), 'seat_types' => collect(), 'vendors' => collect(),
-            ]);
-        }
-
-        // Build virtual schedule entries from routes
-        $schedules = $matchingRoutes->map(function ($route) use ($selectedCurrency, $exchangeRates, $request) {
-            $fare = \App\Models\BusFare::where('route_id', $route->id)->first();
-            $amount = $fare ? $fare->amount : ($route->adult_price ?? 0);
-            $currency = $fare ? $fare->currency : 'USD';
-            $depTime = $fare ? $fare->departure_time : '08:00:00';
-            $arrTime = $fare ? $fare->arrival_time : '16:00:00';
-
-            $dep = \Carbon\Carbon::parse($depTime);
-            $arr = \Carbon\Carbon::parse($arrTime);
-
-            // Get bus for this agency
-            $bus = \Illuminate\Support\Facades\DB::table('buses')
-                ->where('agency_id', $route->agency_id)
-                ->where('status', 'active')
-                ->first();
-
-            $agencyName = $route->agency ? $route->agency->agency_name : 'Unknown';
-            $agencyLogo = $route->agency ? $route->agency->agency_logo : null;
-
-            return [
-                'id' => 'route_' . $route->id,
-                'departure_time' => $depTime,
-                'arrival_time' => $arrTime,
-                'duration' => $arr->diff($dep)->format('%H:%I'),
-                'fare' => (float) $amount,
-                'currency' => $currency,
-                'pickup' => $route->origin,
-                'dropoff' => $route->destination,
-                'bus_type' => $bus ? ($bus->bus_type ?? 'Standard') : 'Standard',
-                'amenities' => [],
-                'bus' => $bus ? [
-                    'id' => $bus->id,
-                    'name' => $bus->name,
-                    'plate_number' => $bus->plate_number,
-                    'agency' => ['id' => $route->agency_id, 'agency_name' => $agencyName, 'agency_logo' => $agencyLogo],
-                    'layout' => ['total_seats' => $bus->capacity ?? 40],
-                ] : [
-                    'id' => null,
-                    'name' => 'Bus',
-                    'agency' => ['id' => $route->agency_id, 'agency_name' => $agencyName, 'agency_logo' => $agencyLogo],
-                    'layout' => ['total_seats' => 40],
-                ],
-                'route' => $route,
-                'stops' => collect(),
-                'convertedFare' => $this->convertCurrency($amount, $currency, $selectedCurrency, $exchangeRates),
-                'selectedCurrency' => $selectedCurrency,
-                'seats_left' => $bus ? ($bus->capacity ?? 40) : 40,
-                'rating' => 0,
-                'status' => 'scheduled',
-            ];
-        });
-
-        $filters = $this->generateFilters($schedules->toArray());
-
-        return view('bus.search.results', [
-            'schedules' => $schedules,
+        $emptyResult = [
+            'schedules' => collect(),
             'returnSchedules' => collect(),
-            'filters' => $filters,
-            'originLat' => $request->origin_lat,
-            'originLng' => $request->origin_lng,
-            'destinationLat' => $request->destination_lat,
-            'destinationLng' => $request->destination_lng,
+            'filters' => $this->getDefaultFilters(),
+            'originLat' => $request->origin_lat ?? null,
+            'originLng' => $request->origin_lng ?? null,
+            'destinationLat' => $request->destination_lat ?? null,
+            'destinationLng' => $request->destination_lng ?? null,
             'travel_type' => $travelType,
-            'recommended_price' => $schedules->min('fare'),
-            'recommended_duration' => null,
-            'cheapest_price' => $schedules->min('fare'),
-            'fastest_duration' => null,
-            'min_price' => $schedules->min('fare'),
-            'max_price' => $schedules->max('fare'),
-            'bus_types' => $schedules->pluck('bus_type')->unique(),
-            'departure_times' => collect(),
-            'amenities' => collect(),
-            'seat_types' => collect(),
-            'vendors' => collect(),
-        ]);
+            'recommended_price' => null, 'recommended_duration' => null,
+            'cheapest_price' => null, 'fastest_duration' => null,
+            'min_price' => 0, 'max_price' => 0,
+            'bus_types' => collect(), 'departure_times' => collect(),
+            'amenities' => collect(), 'seat_types' => collect(), 'vendors' => collect(),
+        ];
+
+        try {
+            $matchingRoutes = \App\Models\BusRoutes::where(function($q) use ($originInput, $originFirst) {
+                    $q->where('origin', 'LIKE', "%{$originFirst}%")
+                      ->orWhere('origin', 'LIKE', "%{$originInput}%");
+                })
+                ->where(function($q) use ($destinationInput, $destinationFirst) {
+                    $q->where('destination', 'LIKE', "%{$destinationFirst}%")
+                      ->orWhere('destination', 'LIKE', "%{$destinationInput}%");
+                })
+                ->with(['agency'])
+                ->get();
+
+            if ($matchingRoutes->isEmpty()) {
+                return view('bus.search.results', $emptyResult);
+            }
+
+            $schedules = $matchingRoutes->map(function ($route) use ($selectedCurrency, $exchangeRates) {
+                try {
+                    $fare = \App\Models\BusFare::where('route_id', $route->id)->first();
+                    $amount = $fare ? (float)$fare->amount : (float)($route->adult_price ?? 0);
+                    $currency = $fare ? ($fare->currency ?? 'USD') : 'USD';
+                    $depTime = $fare ? ($fare->departure_time ?? '08:00:00') : '08:00:00';
+                    $arrTime = $fare ? ($fare->arrival_time ?? '16:00:00') : '16:00:00';
+
+                    $dep = \Carbon\Carbon::parse($depTime);
+                    $arr = \Carbon\Carbon::parse($arrTime);
+                    $duration = $arr->gt($dep) ? $arr->diff($dep)->format('%H:%I') : '08:00';
+
+                    $bus = \Illuminate\Support\Facades\DB::table('buses')
+                        ->where('agency_id', $route->agency_id)
+                        ->first(); // any bus, not just active
+
+                    $agencyName = optional($route->agency)->agency_name ?? 'Bus Operator';
+                    $agencyLogo = optional($route->agency)->agency_logo ?? null;
+                    $agencyId = $route->agency_id ?? 0;
+
+                    return [
+                        'id' => 'route_' . $route->id,
+                        'departure_time' => $depTime,
+                        'arrival_time' => $arrTime,
+                        'duration' => $duration,
+                        'fare' => $amount,
+                        'currency' => $currency,
+                        'pickup' => $route->origin ?? '',
+                        'dropoff' => $route->destination ?? '',
+                        'bus_type' => $bus ? ($bus->bus_type ?? 'Standard') : 'Standard',
+                        'amenities' => [],
+                        'bus' => [
+                            'id' => $bus ? $bus->id : null,
+                            'name' => $bus ? ($bus->name ?? 'Bus') : 'Bus',
+                            'plate_number' => $bus ? ($bus->plate_number ?? '') : '',
+                            'agency_id' => $agencyId,
+                            'agency' => [
+                                'id' => $agencyId,
+                                'agency_name' => $agencyName,
+                                'agency_logo' => $agencyLogo,
+                            ],
+                            'layout' => [
+                                'id' => null,
+                                'name' => 'Standard',
+                                'layout_type' => '2x2',
+                                'total_seats' => $bus ? ($bus->capacity ?? 40) : 40,
+                            ],
+                        ],
+                        'route' => $route,
+                        'stops' => collect(),
+                        'convertedFare' => $this->convertCurrency($amount, $currency, $selectedCurrency, $exchangeRates),
+                        'selectedCurrency' => $selectedCurrency,
+                        'seats_left' => $bus ? ($bus->capacity ?? 40) : 40,
+                        'rating' => 0,
+                        'status' => 'scheduled',
+                    ];
+                } catch (\Exception $e) {
+                    \Log::warning('searchViaRoutes map error: ' . $e->getMessage());
+                    return null;
+                }
+            })->filter()->values();
+
+            if ($schedules->isEmpty()) {
+                return view('bus.search.results', $emptyResult);
+            }
+
+            $minFare = $schedules->min('fare');
+            $maxFare = $schedules->max('fare');
+
+            return view('bus.search.results', array_merge($emptyResult, [
+                'schedules' => $schedules,
+                'filters' => [
+                    'price_range' => ['min' => $minFare ?? 0, 'max' => $maxFare ?? 0],
+                    'bus_types' => $schedules->pluck('bus_type')->unique()->values()->toArray(),
+                    'seat_layouts' => [],
+                    'departure_times' => ['morning' => 0, 'afternoon' => 0, 'evening' => 0, 'night' => 0],
+                    'amenities' => [],
+                    'agencies' => $schedules->pluck('bus.agency.agency_name')->unique()->values()->toArray(),
+                ],
+                'recommended_price' => $minFare,
+                'cheapest_price' => $minFare,
+                'min_price' => $minFare ?? 0,
+                'max_price' => $maxFare ?? 0,
+                'bus_types' => $schedules->pluck('bus_type')->unique(),
+            ]));
+
+        } catch (\Exception $e) {
+            \Log::error('searchViaRoutes error: ' . $e->getMessage());
+            return view('bus.search.results', $emptyResult);
+        }
     }
 }
