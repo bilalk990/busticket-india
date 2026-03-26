@@ -69,6 +69,7 @@
                             <form method="POST" action="{{ route('booking.payment.test') }}" id="test-payment-form">
                                 @csrf
                                 <input type="hidden" name="tx_ref" value="{{ $token }}"/>
+                                <input type="hidden" name="booking_data" value="{{ base64_encode(json_encode($data)) }}"/>
                                 <button type="submit" class="w-100 btn mb-3" style="background: linear-gradient(135deg, #28a745, #20c997); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.5px;">
                                     🧪 Test Payment — Confirm Booking Instantly (Demo)
                                 </button>

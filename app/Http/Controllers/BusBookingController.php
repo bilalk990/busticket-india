@@ -601,13 +601,21 @@ class BusBookingController extends Controller
             'data_keys'      => $data ? array_keys($data) : 'NULL',
         ]);
 
+        // Session mismatch or missing - try to recover from POST data
+        if (!$data && $request->has('booking_data')) {
+            $data = json_decode(base64_decode($request->input('booking_data')), true);
+            $bookingreference = $tx_ref; // trust the POST tx_ref
+            Log::info('Test Payment - Recovered data from POST (session was lost)');
+        }
+
         // Session mismatch or missing
         if (!$data || !$bookingreference) {
             Log::error('Test Payment - Session missing or expired');
             return redirect()->route('home')->with('error', 'Session expired. Please start your booking again.');
         }
 
-        if ($tx_ref !== $bookingreference) {
+        // Only check tx_ref if we got data from session (not POST recovery)
+        if (Session::get('tx_ref') && $tx_ref !== $bookingreference) {
             Log::error("Test Payment - tx_ref mismatch: request=$tx_ref session=$bookingreference");
             return redirect()->route('home')->with('error', 'Invalid payment token. Please try again.');
         }
