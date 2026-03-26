@@ -230,11 +230,13 @@ class BusBookingController extends Controller
 
     public function passengerDetails(Request $request, $scheduleId)
     {
-        // Validate the input
-            $validatedData = $request->validate([
+        // Validate the input - skip bus_schedules existence check for virtual route IDs
+        $isVirtual = str_starts_with($scheduleId, 'route_');
+        
+        $validatedData = $request->validate([
             'seats_outbound' => 'required|string',
             'seats_return' => 'nullable|string',
-            'return_schedule_id' => 'nullable|exists:bus_schedules,id',
+            'return_schedule_id' => 'nullable|string',
             'outbound_price' => 'required|numeric',
             'return_price' => 'nullable|numeric',
             'currency' => 'required|string',
@@ -252,26 +254,51 @@ class BusBookingController extends Controller
         $returnSeats = $request->input('seats_return')
             ? explode(',', $request->input('seats_return', ''))
             : [];
-        Log::info('Outbound Selected Seats: ' . implode(', ', $outboundSeats));
-        Log::info('Return Selected Seats: ' . implode(', ', $returnSeats));
-
 
         if (empty($outboundSeats)) {
             return redirect()->back()->with('error', 'You must select at least one seat for the outbound trip!');
         }
 
+        // Handle virtual schedule IDs (route_X)
+        if ($isVirtual) {
+            $routeId = str_replace('route_', '', $scheduleId);
+            $route = \App\Models\BusRoutes::with(['agency'])->find($routeId);
+            if (!$route) {
+                return redirect()->back()->with('error', 'Route not found.');
+            }
+            $fare = \App\Models\BusFare::where('route_id', $routeId)->first();
+            
+            // Create a virtual schedule object
+            $schedule = (object)[
+                'id' => $scheduleId,
+                'route_id' => $routeId,
+                'departure_time' => $fare ? $fare->departure_time : '08:00:00',
+                'arrival_time' => $fare ? $fare->arrival_time : '16:00:00',
+                'departure_date' => now()->addDay()->format('Y-m-d'),
+                'status' => 'scheduled',
+                'route' => $route,
+                'bus' => (object)[
+                    'id' => null,
+                    'name' => 'Bus',
+                    'agency_id' => $route->agency_id,
+                    'agency' => (object)[
+                        'id' => $route->agency_id,
+                        'agency_name' => optional($route->agency)->agency_name ?? 'Bus Operator',
+                        'agency_logo' => optional($route->agency)->agency_logo ?? null,
+                    ],
+                ],
+            ];
+            $agencyDocumentTypes = collect();
+        } else {
+            $schedule = BusSchedules::with(['route', 'bus.agency.documentTypes'])->findOrFail($scheduleId);
+            $agencyDocumentTypes = $schedule->bus->agency->documentTypes()
+                ->active()
+                ->ordered()
+                ->get();
+        }
 
-        $schedule = BusSchedules::with(['route', 'bus.agency.documentTypes'])->findOrFail($scheduleId);
         $returnScheduleId = $request->input('return_schedule_id');
-        $returnSchedule = $returnScheduleId
-            ? BusSchedules::with(['route', 'bus.agency.documentTypes'])->find($returnScheduleId)
-            : null;
-
-        // Get agency document types for the outbound schedule
-        $agencyDocumentTypes = $schedule->bus->agency->documentTypes()
-            ->active()
-            ->ordered()
-            ->get();
+        $returnSchedule = null;
 
         // Get countries for dropdown
         $countries = \App\Models\Country::orderBy('country_name')->get();
@@ -497,9 +524,9 @@ class BusBookingController extends Controller
         $validatedData = $request->validate([
             'contact_phone' => 'required|string',
             'contact_email' => 'required|email',
-            'email_verified' => 'required|in:0,1', // Allow both 0 and 1
-            'schedule_id' => 'required|integer',
-            'return_schedule_id' => 'nullable|integer',
+            'email_verified' => 'required|in:0,1',
+            'schedule_id' => 'required|string',
+            'return_schedule_id' => 'nullable|string',
             'outboundSeats' => 'required|string',
             'returnSeats' => 'nullable|string',
             'passengers' => 'required|array',
@@ -647,8 +674,29 @@ class BusBookingController extends Controller
             $finalPrice = $data['final_price'] ?? $totalAmount;
             
             // Get the schedule to get agency_id
-            $schedule = BusSchedules::with('bus')->find($scheduleId);
-            $agencyId = $schedule->bus->agency_id ?? null;
+            // Handle virtual route IDs (route_X) by creating a real schedule record
+            if (str_starts_with($scheduleId, 'route_')) {
+                $routeId = str_replace('route_', '', $scheduleId);
+                $route = \App\Models\BusRoutes::with('agency')->find($routeId);
+                $bus = \Illuminate\Support\Facades\DB::table('buses')->where('agency_id', $route->agency_id)->first();
+                $fare = \App\Models\BusFare::where('route_id', $routeId)->first();
+                
+                // Create a real bus_schedules record
+                $realSchedule = BusSchedules::create([
+                    'route_id' => $routeId,
+                    'bus_id' => $bus ? $bus->id : null,
+                    'agency_id' => $route->agency_id,
+                    'departure_date' => now()->addDay()->format('Y-m-d'),
+                    'departure_time' => $fare ? $fare->departure_time : '08:00:00',
+                    'arrival_time' => $fare ? $fare->arrival_time : '16:00:00',
+                    'status' => 'scheduled',
+                ]);
+                $scheduleId = $realSchedule->id;
+                $agencyId = $route->agency_id;
+            } else {
+                $schedule = BusSchedules::with('bus')->find($scheduleId);
+                $agencyId = $schedule ? ($schedule->bus->agency_id ?? null) : null;
+            }
             
             // Initialize passenger details array
             $passengerDetails = [];
