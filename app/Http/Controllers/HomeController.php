@@ -72,46 +72,32 @@ class HomeController extends Controller
                 ->get();
         }
 
-        // Cache top routes for 30 minutes (v3 - fixed relationships)
+        // Cache top routes - v5
         try {
-            $topRoutes = Cache::remember('top_routes_home_v4', 60, function () {
-                return BusFare::with(['pickupPoint', 'dropoffPoint'])
-                    ->select('id', 'pickup', 'dropoff', 'amount', 'currency', 'departure_time', 'arrival_time')
-                    ->get()
-                    ->filter(function ($fare) {
-                        return $fare->pickupPoint && $fare->dropoffPoint;
-                    })
-                    ->take(30)
-                    ->map(function ($fare) {
-                        return (object)[
-                            'pickup_name' => $fare->pickupPoint->name,
-                            'dropoff_name' => $fare->dropoffPoint->name,
-                            'pickup_latitude' => $fare->pickupPoint->latitude ?? null,
-                            'pickup_longitude' => $fare->pickupPoint->longitude ?? null,
-                            'dropoff_latitude' => $fare->dropoffPoint->latitude ?? null,
-                            'dropoff_longitude' => $fare->dropoffPoint->longitude ?? null,
-                        ];
-                    });
+            $topRoutes = Cache::remember('top_routes_home_v5', 300, function () {
+                // Direct join query - bypasses ORM relationship issues
+                $rows = \Illuminate\Support\Facades\DB::table('bus_fares as bf')
+                    ->join('bus_points as bp1', 'bf.pickup', '=', 'bp1.id')
+                    ->join('bus_points as bp2', 'bf.dropoff', '=', 'bp2.id')
+                    ->select('bp1.name as pickup_name', 'bp2.name as dropoff_name',
+                             'bp1.latitude as pickup_latitude', 'bp1.longitude as pickup_longitude',
+                             'bp2.latitude as dropoff_latitude', 'bp2.longitude as dropoff_longitude')
+                    ->limit(30)
+                    ->get();
+                return $rows->map(function ($row) {
+                    return (object)[
+                        'pickup_name'       => $row->pickup_name,
+                        'dropoff_name'      => $row->dropoff_name,
+                        'pickup_latitude'   => $row->pickup_latitude,
+                        'pickup_longitude'  => $row->pickup_longitude,
+                        'dropoff_latitude'  => $row->dropoff_latitude,
+                        'dropoff_longitude' => $row->dropoff_longitude,
+                    ];
+                });
             });
         } catch (\Exception $e) {
             \Log::warning('Cache failed for top routes: ' . $e->getMessage());
-            $topRoutes = BusFare::with(['pickupPoint', 'dropoffPoint'])
-                ->select('id', 'pickup', 'dropoff', 'amount', 'currency', 'departure_time', 'arrival_time')
-                ->get()
-                ->filter(function ($fare) {
-                    return $fare->pickupPoint && $fare->dropoffPoint;
-                })
-                ->take(30)
-                ->map(function ($fare) {
-                    return (object)[
-                        'pickup_name' => $fare->pickupPoint->name,
-                        'dropoff_name' => $fare->dropoffPoint->name,
-                        'pickup_latitude' => $fare->pickupPoint->latitude ?? null,
-                        'pickup_longitude' => $fare->pickupPoint->longitude ?? null,
-                        'dropoff_latitude' => $fare->dropoffPoint->latitude ?? null,
-                        'dropoff_longitude' => $fare->dropoffPoint->longitude ?? null,
-                    ];
-                });
+            $topRoutes = collect();
         }
 
         // Group topRoutes by pickup_name for the view
