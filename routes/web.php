@@ -500,3 +500,53 @@ Route::get('/test-qr/{text}', function($text) {
         'message' => 'QR code generated successfully in SVG format'
     ]);
 })->name('test.qr');
+
+Route::get('/fix-data', function () {
+    $routes = \App\Models\BusRoutes::all();
+    $createdFares = 0;
+    $createdPoints = 0;
+
+    foreach ($routes as $route) {
+        $agencyId = $route->agency_id;
+        
+        // Ensure points exist
+        $originPoint = \App\Models\BusPoint::firstOrCreate(
+            ['name' => $route->origin, 'agency_id' => $agencyId],
+            ['status' => 'active']
+        );
+        $destinationPoint = \App\Models\BusPoint::firstOrCreate(
+            ['name' => $route->destination, 'agency_id' => $agencyId],
+            ['status' => 'active']
+        );
+        
+        if ($originPoint->wasRecentlyCreated) $createdPoints++;
+        if ($destinationPoint->wasRecentlyCreated) $createdPoints++;
+
+        // Ensure fare exists
+        $fare = \App\Models\BusFare::firstOrCreate(
+            [
+                'agency_id' => $agencyId,
+                'route_id' => $route->id,
+                'pickup' => $originPoint->id,
+                'dropoff' => $destinationPoint->id,
+            ],
+            [
+                'amount' => 100.00,
+                'currency' => 'INR',
+                'departure_time' => '08:00:00',
+                'arrival_time' => '16:00:00',
+            ]
+        );
+        
+        if ($fare->wasRecentlyCreated) $createdFares++;
+    }
+
+    \Illuminate\Support\Facades\Cache::flush();
+
+    return response()->json([
+        'message' => 'Data fixed!',
+        'routes_processed' => $routes->count(),
+        'fares_created' => $createdFares,
+        'points_created' => $createdPoints,
+    ]);
+});
