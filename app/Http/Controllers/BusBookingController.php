@@ -567,8 +567,10 @@ class BusBookingController extends Controller
         // Log::info("Checkout method checking for seat details: $validatedData");
 
           // Start the session and store data
+        // Store in both session AND database cache (cache survives session loss on Railway)
         Session::put('booking_data', $validatedData);
         Session::put('tx_ref', $token);
+        \Illuminate\Support\Facades\Cache::store('database')->put('booking_' . $token, $validatedData, now()->addHours(2));
         Log::info('Session booking_data set', Session::get('booking_data'));
 
         $currency = $validatedData['currency'];
@@ -592,36 +594,28 @@ class BusBookingController extends Controller
         $tx_ref = $request->get('tx_ref');
         Log::info("Test Payment initiated: tx_ref: $tx_ref");
 
-        $bookingreference = Session::get('tx_ref');
+        $bookingreference = Session::get('tx_ref') ?? $tx_ref;
         $data             = Session::get('booking_data');
 
-        Log::info('Test Payment session data', [
-            'tx_ref_session' => $bookingreference,
-            'tx_ref_request' => $tx_ref,
-            'data_keys'      => $data ? array_keys($data) : 'NULL',
-        ]);
-
-        // Session mismatch or missing - try to recover from POST data
-        if (!$data && $request->has('booking_data')) {
-            $decoded = json_decode(base64_decode($request->input('booking_data')), true);
-            if ($decoded) {
-                $data = $decoded;
-                $bookingreference = $tx_ref;
-                Log::info('Test Payment - Recovered data from POST, keys: ' . implode(', ', array_keys($data)));
-            } else {
-                Log::error('Test Payment - Failed to decode POST booking_data');
+        // Try cache if session is lost (Railway ephemeral filesystem)
+        if (!$data && $tx_ref) {
+            $data = \Illuminate\Support\Facades\Cache::store('database')->get('booking_' . $tx_ref);
+            if ($data) {
+                Log::info('Test Payment - Recovered data from DB Cache');
             }
         }
 
-        // Session mismatch or missing
-        if (!$data || !$bookingreference) {
-            Log::error('Test Payment - No data available. Session: ' . ($bookingreference ?? 'null') . ', POST booking_data: ' . ($request->has('booking_data') ? 'present' : 'missing'));
+        Log::info('Test Payment data check', [
+            'tx_ref'    => $tx_ref,
+            'has_data'  => !empty($data),
+            'data_keys' => $data ? array_keys($data) : [],
+        ]);
+
+        if (!$data) {
+            Log::error('Test Payment - No booking data in session or cache for tx_ref: ' . $tx_ref);
             return response()->json([
-                'error' => 'Session expired',
-                'session_tx_ref' => $bookingreference,
-                'request_tx_ref' => $tx_ref,
-                'has_booking_data_post' => $request->has('booking_data'),
-                'all_post_keys' => array_keys($request->all()),
+                'error'  => 'Session expired - no booking data found',
+                'tx_ref' => $tx_ref,
             ], 400);
         }
 
