@@ -51,6 +51,25 @@ Route::get('/clear-all-cache', function () {
     }
 });
 
+// Debug route - check live database data
+Route::get('/debug-db', function () {
+    $agencies = \Illuminate\Support\Facades\DB::table('bus_agencies')->select('id','agency_name','is_active')->get();
+    $fares = \Illuminate\Support\Facades\DB::table('bus_fares as bf')
+        ->leftJoin('bus_points as bp1', 'bf.pickup', '=', 'bp1.id')
+        ->leftJoin('bus_points as bp2', 'bf.dropoff', '=', 'bp2.id')
+        ->select('bf.id','bf.agency_id','bf.route_id','bp1.name as pickup_name','bp2.name as dropoff_name')
+        ->get();
+    $routes = \Illuminate\Support\Facades\DB::table('bus_routes')->select('id','agency_id','origin','destination')->get();
+    return response()->json([
+        'db_host' => config('database.connections.mysql.host'),
+        'db_name' => config('database.connections.mysql.database'),
+        'agencies' => $agencies,
+        'fares' => $fares,
+        'routes_count' => $routes->count(),
+        'routes' => $routes
+    ]);
+});
+
 Route::get('/debug-db/{agency_id}', function ($agency_id) {
     if (!app()->environment('local') && env('DEBUG_PASS') !== request('pass')) {
         // Simple protection
